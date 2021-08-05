@@ -14,12 +14,12 @@ jobs:
       with:
         fetch-depth: '0'
 
-    - run: echo "/opt/conda/bin:${PATH}" >> $GITHUB_PATH
-    - run: sudo apt-get -y update && sudo apt-get -y install wget gcc && wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && bash Miniconda3-latest-Linux-x86_64.sh -b -f -p /opt/conda && export PATH=/opt/conda/bin:$PATH && conda update -y conda && conda install -y conda-build && conda update -y conda-build 
-    - run: conda install -c anaconda python=3.8
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        auto-update-conda: true
+        python-version: 3.8
     - run: conda install -c dhealth -c bioconda -c conda-forge pyecvl-cpu
-    - run: export PATH=/opt/conda/bin:$PATH && pip install pytest wheel
-
+    - run:  pip install pytest wheel
 
     - name: test
       run: make test
