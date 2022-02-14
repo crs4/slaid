@@ -6,7 +6,7 @@ import numpy as np
 from dask import delayed
 
 from slaid.classifiers.base import BasicClassifier
-from slaid.commons import BasicSlide, Filter, Slide
+from slaid.commons import BasicSlide, Filter, NapariSlide
 from slaid.commons.dask import Mask
 from slaid.models.base import Model
 
@@ -22,7 +22,7 @@ class Classifier(BasicClassifier):
         self.compute_mask = compute_mask
 
     def classify(self,
-                 slide: Slide,
+                 slide: NapariSlide,
                  filter_=None,
                  threshold: float = None,
                  level: int = 2,
