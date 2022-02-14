@@ -8,7 +8,7 @@ import zarr
 from dask.distributed import Client, progress
 
 from slaid.commons import Mask as BaseMask
-from slaid.commons.base import Slide as BaseSlide
+from slaid.commons.base import NapariSlide as BaseSlide
 from slaid.commons.base import SlideArray
 
 logger = logging.getLogger()
@@ -22,6 +22,7 @@ def init_client(address=None, processes=False, **kwargs):
 
 
 class Mask(BaseMask):
+
     def compute(self):
         if isinstance(self.array, da.Array):
             self.array = self.array.compute(rerun_exceptions_locally=True)
@@ -61,6 +62,7 @@ class Mask(BaseMask):
 
 
 class Slide(BaseSlide):
+
     def _read_from_store(self, dataset):
         return da.from_zarr(self._store, component=dataset["path"])
 
@@ -70,6 +72,7 @@ class Slide(BaseSlide):
 
 
 class DaskSlideArray(SlideArray):
+
     @property
     def array(self):
         return self._array
