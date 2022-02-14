@@ -51,17 +51,20 @@ class Image(BaseImage):
 
     def to_array(self, image_info: ImageInfo = None):
         # FIXME
-        array = np.array(self._image).transpose(0, 2, 1)
+        array = np.array(self._image)
+        array = array.transpose(0, 2, 1)
+
         if image_info is not None:
             array = self.IMAGE_INFO.convert(array, image_info)
         return array
 
     @property
     def dimensions(self) -> Tuple[int, int]:
-        return self._image.Height(), self._image.Width()
+        return self._image.dims_
 
 
 class BasicSlide(base.BasicSlide):
+
     def __init__(self, filename: str):
         self._level_dimensions = OpenSlideGetLevels(filename)
         if not self._level_dimensions:

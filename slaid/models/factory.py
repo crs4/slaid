@@ -6,6 +6,7 @@ from slaid.models.eddl import Factory as EddlFactory
 
 
 class Factory(BaseFactory):
+
     def __init__(self, filename, **kwargs):
         super().__init__(filename)
         self._kwargs = kwargs
@@ -23,5 +24,4 @@ class Factory(BaseFactory):
         return CommonFactory(self._filename)
 
     def _get_eddl_factory(self):
-        return EddlFactory(self._filename, self._kwargs['gpu'],
-                           self._kwargs.get('batch'))
+        return EddlFactory(self._filename, self._kwargs['gpu'])

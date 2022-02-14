@@ -9,6 +9,7 @@ import zarr
 
 import slaid.writers.tiledb as tiledb_io
 import slaid.writers.zarr as zarr_io
+from slaid.commons.base import Mask
 
 
 @pytest.mark.skip(reason="update how mask are loaded/dumped")
@@ -37,33 +38,27 @@ def test_slide_from_tiledb(slide_with_mask, tmp_path):
     assert slide.masks == tiledb_slide.masks
 
 
-@pytest.mark.parametrize(
-    'storage', [zarr_io.ZarrDirectoryStorage, zarr_io.ZarrZipStorage])
-def test_slide_to_zarr(storage, slide_with_mask, tmp_path):
-    slide = slide_with_mask(np.ones)
-    path = str(tmp_path)
-    ext = 'zip' if storage == zarr_io.ZarrZipStorage else 'zarr'
-    slide_path = os.path.join(path,
-                              f'{os.path.basename(slide.filename)}.{ext}')
-    storage.dump(slide, slide_path)
-    res = storage.load(slide_path)
-    assert res == slide
-
-    group = zarr.open(slide_path)
-    slide_metadata = group.attrs.asdict()
-    assert tuple(slide_metadata['resolution']) == slide.dimensions
-
-    mask = group['mask']
-    mask_metadata = mask.attrs.asdict()
-    assert mask_metadata['dzi_sampling_level'] == 8
-    assert mask_metadata['tile_size'] == 10
+@pytest.mark.parametrize('storage_cls,filename',
+                         [(zarr_io.ZarrStorage, 'test.zip'),
+                          (zarr_io.ZarrStorage, 'test.zarr')])
+def test_mask_to_zarr(storage_cls, filename, tmp_path, mask):
+    name = 'test'
+    store_path = os.path.join(tmp_path, filename)
+    storage = storage_cls(name, store_path)
+    array = storage.zeros((10, 10), 'uint8')
+    mask.array = array
+    storage.write(mask)
+    res = storage.load()
+    assert res == mask
 
 
-@pytest.mark.parametrize(
-    'storage', [zarr_io.ZarrDirectoryStorage, zarr_io.ZarrZipStorage])
-def test_checks_zarr_path_has_masks(storage, slide_with_mask, tmp_path):
-    slide = slide_with_mask(np.ones)
-    path = str(tmp_path)
-    slide_path = os.path.join(path, f'{os.path.basename(slide.filename)}.zarr')
-    storage.dump(slide, slide_path)
-    assert storage.mask_exists(slide_path, 'mask')
+@pytest.mark.parametrize('storage_cls, filename',
+                         [(zarr_io.ZarrStorage, 'test.zip'),
+                          (zarr_io.ZarrStorage, 'test.zarr')])
+def test_checks_zarr_path_has_masks(storage_cls, filename, tmp_path):
+    name = 'test'
+    store_path = os.path.join(tmp_path, filename)
+    storage = storage_cls(name, store_path)
+    assert storage.mask_exists() is False
+    storage.zeros((10, 10), 'uint8')
+    assert storage.mask_exists()
