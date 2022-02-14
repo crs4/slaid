@@ -4,7 +4,7 @@ import numpy as np
 from pyeddl.tensor import Tensor
 import pickle
 
-from slaid.commons import Slide
+from slaid.commons import NapariSlide
 from slaid.commons.base import Image, ImageInfo
 from slaid.models.base import Factory as BaseFactory
 from slaid.models.base import Model as BaseModel
@@ -12,6 +12,7 @@ from slaid.models.eddl import Model as EddlModel
 
 
 class Factory(BaseFactory):
+
     def get_model(self):
         with open(self._filename, 'rb') as f:
             return pickle.load(f)
@@ -28,6 +29,7 @@ class GreenModel(BaseModel):
 
 
 class EddlGreenModel(EddlModel):
+
     def __init__(self, patch_size=None):
         self.patch_size = patch_size
 
@@ -43,6 +45,7 @@ class EddlGreenModel(EddlModel):
 
 
 class EddlGreenPatchModel(EddlModel):
+
     def __init__(self, patch_size=(256, 256)):
         self.patch_size = patch_size
 
@@ -60,6 +63,7 @@ class EddlGreenPatchModel(EddlModel):
 
 
 class BaseDummyModel(BaseModel):
+
     def __init__(self, patch_size=None):
         self.patch_size = patch_size
         self.array_predicted = []
@@ -83,7 +87,8 @@ class DummyModel(BaseDummyModel):
         return self.func(array.shape[0])
 
 
-class DummySlide(Slide):
+class DummySlide(NapariSlide):
+
     def __init__(self,
                  level_dimensions: List[Tuple[int, int]],
                  level_downsamples: List[Tuple[int, int]],
@@ -117,6 +122,7 @@ class DummySlide(Slide):
 
 
 class AllOneModel(BaseDummyModel):
+
     def _predict(self, array):
         return np.ones(array.shape[0], dtype=np.uint8)
 
