@@ -1,24 +1,39 @@
+import abc
 import logging
-import os
-from importlib import import_module
+from dataclasses import dataclass
 
-from slaid.commons import BaseSlideFactory, SlideStore
-from slaid.writers import REGISTRY
+from slaid.commons import BasicSlide, ImageInfo, Slide
 
 logger = logging.getLogger('slaid.commons.factory')
 
 
-class SlideFactory(BaseSlideFactory):
-    def get_slide(self):
-        basic_slide_cls = import_module(
-            f'slaid.commons.{self._basic_slide_module}').BasicSlide
-        slide_cls = import_module(f'slaid.commons.{self._slide_module}').Slide
+class BaseSlideFactory(abc.ABC):
 
-        slide_ext_with_dot = os.path.splitext(self._filename)[-1]
-        slide_ext = slide_ext_with_dot[1:]
-        try:
-            basic_slide = REGISTRY[slide_ext].load(self._filename)
-        except KeyError:
-            basic_slide = basic_slide_cls(self._filename)
-        store = SlideStore(basic_slide, self._tilesize)
-        return slide_cls(store, self._image_info)
+    @abc.abstractmethod
+    def get_slide(self) -> Slide:
+        ...
+
+
+class MetaSlideFactory:
+    _registry = {}
+
+    @staticmethod
+    def register(cls_to_create: Slide):
+
+        def _register(cls_factory: BaseSlideFactory):
+            MetaSlideFactory._registry[cls_to_create] = cls_factory
+
+        return _register
+
+    def get_factory(self, cls_name: str, *args) -> BaseSlideFactory:
+        return self._registry[cls_name](*args)
+
+
+@MetaSlideFactory.register(Slide)
+@dataclass
+class SlideFactory(BaseSlideFactory):
+    slide_filename: str
+    slide_reader_cls: BasicSlide
+
+    def get_slide(self) -> Slide:
+        return Slide(self.slide_reader_cls(self.slide_filename))
