@@ -31,6 +31,7 @@ def get_class(name, module):
 
 @dataclass
 class ImageInfo:
+
     class COLORTYPE(Enum):
         RGB = 'rgb'
         BGR = 'bgr'
@@ -73,6 +74,7 @@ class ImageInfo:
 
 
 class Image(abc.ABC):
+
     @abc.abstractproperty
     def dimensions(self) -> Tuple[int, int]:
         pass
@@ -101,11 +103,12 @@ class Mask:
     extraction_level: int
     level_downsample: int
     slide_levels: List[Tuple[int, int]]
-    datetime: dt = None
     round_to_0_100: bool = False
     threshold: float = None
     model: str = None
-    tile_size: int = None
+    slide: str = None
+    label: str = None
+    tile_size: int = 1
 
     def __post_init__(self):
         self.dzi_sampling_level = math.ceil(
@@ -141,7 +144,8 @@ class Mask:
             and self.threshold == other.threshold \
             and self.model == other.model \
             and self.round_to_0_100 == other.round_to_0_100 \
-            and self.datetime == other.datetime \
+            and self.tile_size == other.tile_size \
+            and self.slide == other.slide \
             and check_array
 
     def to_image(self, downsample: int = 1, threshold: float = None):
@@ -152,62 +156,23 @@ class Mask:
             array = apply_threshold(array, threshold)
         return PIL.Image.fromarray((255 * array).astype('uint8'), 'L')
 
-    def to_zarr(self, group, name: str, overwrite: bool = False):
-        if overwrite and name in group:
-            del group[name]
-        array = group.array(name, self.array)
-        for attr, value in self._get_attributes().items():
-            logger.info('writing attr %s %s', attr, value)
-            array.attrs[attr] = value
-
-    def _get_attributes(self):
+    def get_attributes(self):
         attrs = {}
         attrs['extraction_level'] = self.extraction_level
         attrs['dzi_sampling_level'] = self.dzi_sampling_level
         attrs['level_downsample'] = self.level_downsample
-        attrs['datetime'] = self.datetime.timestamp()
         attrs['round_to_0_100'] = self.round_to_0_100
+        attrs['slide_levels'] = self.slide_levels
+        attrs['tile_size'] = self.tile_size
         if self.threshold:
             attrs['threshold'] = self.threshold
         if self.model:
             attrs['model'] = self.model
-            attrs['tile_size'] = self.tile_size
         return attrs
-
-    def to_tiledb(self, path, overwrite: bool = False, ctx: tiledb.Ctx = None):
-        logger.info('dumping mask to tiledb on path %s', path)
-        if os.path.isdir(path) and overwrite:
-            tiledb.remove(path, ctx=ctx)
-        tiledb.from_numpy(path, self.array, ctx=ctx)
-        self._write_meta_tiledb(path, ctx=ctx)
-
-    def _write_meta_tiledb(self, path, ctx: tiledb.Ctx = None):
-        with tiledb.open(path, 'w', ctx=ctx) as array:
-            array.meta['extraction_level'] = self.extraction_level
-            array.meta['level_downsample'] = self.level_downsample
-            if self.threshold:
-                array.meta['threshold'] = self.threshold
-            if self.model:
-                array.meta['model'] = self.model
-
-    @classmethod
-    def from_tiledb(cls, path, ctx: tiledb.Ctx = None):
-        array = tiledb.open(path, ctx=ctx)
-        return Mask(array, array.meta['extraction_level'],
-                    array.meta['level_downsample'],
-                    cls._get_meta(array, 'threshold'),
-                    cls._get_meta(array, 'model'))
-
-    @staticmethod
-    def _get_meta(array, attr):
-        try:
-            res = array.meta[attr]
-        except KeyError:
-            res = None
-        return res
 
 
 class Filter:
+
     def __init__(self, mask: Mask, array: np.ndarray):
         self._mask = mask
 
@@ -240,26 +205,6 @@ class Filter:
                 res[x * scale[0]:x * scale[0] + scale[0],
                     y * scale[1]:y * scale[1] + scale[1]] = self._array[x, y]
         self._array = res
-
-
-def do_filter(slide: "Slide", condition: str) -> "Filter":
-    operator_mapping = {
-        '>': '__gt__',
-        '>=': '__ge__',
-        '<': '__lt__',
-        '<=': '__le__',
-        '==': '__eq__',
-        '!=': '__ne__',
-    }
-
-    condition = condition.replace('"', '')
-    parsed = re.match(
-        r"(?P<mask>\w+)\s*(?P<operator>[<>=!]+)\s*(?P<value>\d+\.*\d*)",
-        condition).groupdict()
-    mask = slide.masks[parsed['mask']]
-    operator = operator_mapping[parsed['operator']]
-    value = float(parsed['value'])
-    return getattr(mask, operator)(value)
 
 
 class BasicSlide(abc.ABC):
@@ -306,6 +251,143 @@ class BasicSlide(abc.ABC):
 
 
 class Slide(BasicSlide):
+
+    def __init__(self, slide_reader: BasicSlide):
+        self._slide_reader = slide_reader
+
+    @property
+    def masks(self):
+        return self._slide_reader.masks
+
+    @property
+    def image_info(self):
+        return self._slide_reader.IMAGE_INFO
+
+    def __getitem__(self, key) -> "SlideArray":
+        return BasicSlideArray(self._slide_reader, key, self.image_info)
+
+    @property
+    def dimensions(self) -> Tuple[int, int]:
+        return self._slide_reader.dimensions
+
+    @property
+    def filename(self):
+        return self._slide_reader.filename
+
+    def read_region(self, location: Tuple[int, int], level: int,
+                    size: Tuple[int, int]) -> Image:
+        return self._slide_reader.read_region(location, level, size)
+
+    def get_best_level_for_downsample(self, downsample: int):
+        return self._slide_reader.get_best_level_for_downsample(downsample)
+
+    @property
+    def level_dimensions(self):
+        return self._slide_reader.level_dimensions
+
+    @property
+    def level_downsamples(self):
+        return self._slide_reader.level_downsamples
+
+
+class SlideArray(abc.ABC):
+
+    @abc.abstractmethod
+    def __getitem__(self, key) -> "SlideArray":
+        ...
+
+    @abc.abstractproperty
+    def array(self):
+        ...
+
+    @abc.abstractmethod
+    def convert(self, image_info: ImageInfo) -> "SlideArray":
+        ...
+
+    @abc.abstractproperty
+    def size(self) -> Tuple[int, int]:
+        ...
+
+
+class BasicSlideArray(SlideArray):
+
+    def __init__(self, slide: BasicSlide, level: int, image_info: ImageInfo):
+        self._slide = slide
+        self._level = level
+        self.image_info = image_info
+        self._array: np.ndarray = None
+
+    @property
+    def array(self):
+        if self._array is not None:
+            return self._array
+        logger.warn('reading the whole slide...')
+
+        image = self._slide.read_region(
+            (0, 0), self._level, self._slide.level_dimensions[self._level])
+        self._array = image.to_array()
+        return self._array
+
+    def __getitem__(self, key: Tuple[slice, slice]) -> "SlideArray":
+
+        def get_slice_stop(slice_value: int, limit: int):
+            return min(slice_value,
+                       limit) if slice_value is not None else limit
+
+        if self._array is not None:
+            array = self._array[:, key[0], key[1]] if self._is_channel_first(
+            ) else self._array[key[0], key[1], :]
+        else:
+            slice_x = key[1]
+            slice_y = key[0]
+
+            slice_x_start = slice_x.start or 0
+            slice_x_stop = get_slice_stop(
+                slice_x.stop, self._slide.level_dimensions[self._level][0])
+
+            slice_y_start = slice_y.start or 0
+            slice_y_stop = get_slice_stop(
+                slice_y.stop, self._slide.level_dimensions[self._level][1])
+
+            slice_x = slice(slice_x_start, slice_x_stop)
+            slice_y = slice(slice_y_start, slice_y_stop)
+
+            location = (slice_x.start, slice_y.start)
+            location_at_level_0 = tuple([
+                int(c * self._slide.level_downsamples[self._level])
+                for c in location
+            ])
+            size = (slice_x.stop - slice_x.start, slice_y.stop - slice_y.start)
+            array = self._slide.read_region(location_at_level_0, self._level,
+                                            size).to_array()
+        slide_array = self._clone(array)
+        return slide_array
+
+    def convert(self, image_info: ImageInfo) -> SlideArray:
+        array = self.image_info.convert(self.array, image_info)
+        return self._clone(array, image_info)
+
+    @property
+    def size(self) -> Tuple[int, int]:
+        if self._array is not None:
+            return self._array.shape[1:] if self._is_channel_first(
+            ) else self._array.shape[:2]
+        return self._slide.level_dimensions[self._level][::-1]
+
+    def _clone(self,
+               array: np.ndarray = None,
+               image_info: ImageInfo = None) -> SlideArray:
+        slide_array = BasicSlideArray(self._slide, self._level, image_info
+                                      or self.image_info)
+        slide_array._array = array
+        return slide_array
+
+    def _is_channel_first(self):
+        return self.image_info.channel == ImageInfo.CHANNEL.FIRST
+
+
+class NapariSlide(BasicSlide):
+
     def __init__(self, store: "SlideStore", image_info: ImageInfo = None):
         self._store = store
         self._slide = store.slide
@@ -321,8 +403,8 @@ class Slide(BasicSlide):
         return self._slide.masks
 
     def _create_slide(self, dataset):
-        return SlideArray(self._read_from_store(dataset),
-                          self._slide.IMAGE_INFO)
+        return NapariSlideArray(self._read_from_store(dataset),
+                                self._slide.IMAGE_INFO)
 
     def _read_from_store(self, dataset):
         return zarr.open(store=self._store, path=dataset["path"], mode='r')
@@ -358,7 +440,8 @@ class Slide(BasicSlide):
         return self._slide.level_downsamples
 
 
-class SlideArray:
+class NapariSlideArray:
+
     def __init__(self, array: np.ndarray, image_info: ImageInfo = None):
         self._array = array
         self._image_info = image_info
@@ -447,12 +530,22 @@ def _create_metastore(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:
 
 
 class SlideStore(OpenSlideStore):
-    def __init__(self, slide: "Slide", tilesize: int = DEFAULT_TILESIZE):
+
+    def __init__(self, slide: "Slide", tilesize: int = None):
         self._path = slide.filename
         self._slide = slide
-        self._tilesize = tilesize
-        self._store = _create_metastore(self._slide, tilesize)
+        self._tilesize = tilesize or DEFAULT_TILESIZE
+        self._store = _create_metastore(self._slide, self._tilesize)
         #  self._image_info = image_info if image_info else ImageInfo()
+
+    @property
+    def tilesize(self):
+        return self._tilesize
+
+    @tilesize.setter
+    def tilesize(self, value):
+        self._tilesize = value
+        self._store = _create_metastore(self._slide, value)
 
     @property
     def slide(self):
@@ -478,7 +571,7 @@ class SlideStore(OpenSlideStore):
             raise err
         except Exception as ex:
             logger.error('ex %s', ex)
-            raise KeyError(key)
+            raise KeyError(key) from ex
 
         return tile.to_array().tobytes()
 
@@ -491,19 +584,21 @@ class SlideStore(OpenSlideStore):
         return x, y, int(level)
 
 
-class BaseSlideFactory(abc.ABC):
-    def __init__(self,
-                 filename: str,
-                 basic_slide_module: str,
-                 slide_module: str,
-                 tilesize: int = DEFAULT_TILESIZE,
-                 image_info: ImageInfo = None):
-        self._filename = filename.rstrip('/')
-        self._basic_slide_module = basic_slide_module
-        self._slide_module = slide_module
-        self._tilesize = tilesize
-        self._image_info = image_info
+class ArrayFactory(abc.ABC):
 
     @abc.abstractmethod
-    def get_slide(self) -> Slide:
-        pass
+    def empty(self, shape: Tuple[int, int], dtype: str):
+        ...
+
+    @abc.abstractmethod
+    def zeros(self, shape: Tuple[int, int], dtype: str):
+        ...
+
+
+class NumpyArrayFactory(ArrayFactory):
+
+    def empty(self, shape: Tuple[int, int], dtype: str):
+        return np.empty(shape, dtype=dtype)
+
+    def zeros(self, shape: Tuple[int, int], dtype: str):
+        return np.zeros(shape, dtype=dtype)
