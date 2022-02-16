@@ -31,9 +31,8 @@ import logging
 from typing import List, Tuple
 
 import numpy as np
-from openslide import open_slide
 from pyecvl.ecvl import Image as EcvlImage
-from pyecvl.ecvl import OpenSlideGetLevels, OpenSlideRead
+from pyecvl.ecvl import OpenSlideImage
 
 from slaid.commons import Image as BaseImage
 from slaid.commons import ImageInfo
@@ -44,50 +43,50 @@ logger = logging.getLogger('ecvl')
 
 
 class Image(BaseImage):
-    IMAGE_INFO = ImageInfo.create('bgr', 'yx', 'first')
+    IMAGE_INFO = ImageInfo.create('rgb', 'yx', 'first')
 
     def __init__(self, image: EcvlImage):
         self._image = image
 
     def to_array(self, image_info: ImageInfo = None):
         # FIXME
-        array = np.array(self._image).transpose(0, 2, 1)
+        array = np.array(self._image)
+        array = array.transpose(0, 2, 1)
+
         if image_info is not None:
             array = self.IMAGE_INFO.convert(array, image_info)
         return array
 
     @property
     def dimensions(self) -> Tuple[int, int]:
-        return self._image.Height(), self._image.Width()
+        return self._image.dims_
 
 
 class BasicSlide(base.BasicSlide):
+    IMAGE_INFO = Image.IMAGE_INFO
+
     def __init__(self, filename: str):
-        self._level_dimensions = OpenSlideGetLevels(filename)
-        if not self._level_dimensions:
-            raise base.BasicSlide.InvalidFile(
-                f'Cannot open file {filename}, is it a slide image?')
         super().__init__(filename)
+        self._slide = OpenSlideImage(filename)
 
     @property
     def dimensions(self) -> Tuple[int, int]:
-        return tuple(self._level_dimensions[0])
+        return tuple(self._slide.GetLevelsDimensions()[0])
 
     def read_region(self, location: Tuple[int, int], level,
                     size: Tuple[int, int]) -> Image:
-        return Image(OpenSlideRead(self._filename, level, location + size))
+        return Image(self._slide.ReadRegion(level, location + size))
 
     def get_best_level_for_downsample(self, downsample: int):
-        return open_slide(
-            self._filename).get_best_level_for_downsample(downsample)
+        return self._slide.GetBestLevelForDownsample(downsample)
 
     @property
     def level_dimensions(self) -> List[Tuple[int, int]]:
-        return [tuple(d) for d in self._level_dimensions]
+        return [tuple(d) for d in self._slide.GetLevelsDimensions()]
 
     @property
     def level_downsamples(self):
-        return open_slide(self._filename).level_downsamples
+        return self._slide.GetLevelDownsamples()
 
 
 def load(filename: str):
