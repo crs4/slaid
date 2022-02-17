@@ -5,22 +5,16 @@ import pytest
 import tiledb
 
 from slaid.commons import Mask
-from slaid.commons.base import ImageInfo, Slide, SlideArray
-from slaid.commons.dask import Slide as DaskSlide, DaskSlideArray
+from slaid.commons.base import ImageInfo, Slide
 from slaid.commons.dask import Mask as DaskMask
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
+from slaid.commons.openslide import BasicSlide as OpenSlide
 
 IMAGE = 'tests/data/test.tif'
 
 
-@pytest.mark.parametrize('image_info', [
-    ImageInfo.create('bgr', 'yx', 'first'),
-    ImageInfo.create('rgb', 'yx', 'first'),
-    ImageInfo.create('rgb', 'yx', 'last'),
-    ImageInfo.create('bgr', 'yx', 'last')
-])
-@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
-@pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
+@pytest.mark.parametrize('slide_cls,args', [(Slide, (EcvlSlide, )),
+                                            (Slide, (OpenSlide, ))])
 def test_slide_level(slide):
     for i in range(slide.level_count):
         array = slide[i]
@@ -33,38 +27,24 @@ def test_slide_level(slide):
     ImageInfo.create('rgb', 'yx', 'last'),
     ImageInfo.create('bgr', 'yx', 'last')
 ])
-@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
-@pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
+@pytest.mark.parametrize('slide_cls,args', [(Slide, (EcvlSlide, )),
+                                            (Slide, (OpenSlide, ))])
 def test_slice_slide(slide, image_info):
     for i in range(slide.level_count):
-        array = slide[i].convert(image_info)
+        slide_array = slide[i]
         expected_shape = (
             3, 10,
-            20) if slide.image_info.channel == ImageInfo.CHANNEL.FIRST else (
-                10, 20, 3)
-        assert array[:10, :20]._array.shape == expected_shape
+            20) if image_info.channel == ImageInfo.CHANNEL.FIRST else (10, 20,
+                                                                       3)
+        sliced_array = slide_array[:10, :20]
+        sliced_array = sliced_array.convert(image_info)
+        assert sliced_array.size == (10, 20)
+        assert sliced_array.array.shape == expected_shape
 
+        sliced_array = slide_array[1:10, 1:20]
+        sliced_array = sliced_array.convert(image_info)
+        assert sliced_array.size == (9, 19)
 
-@pytest.mark.parametrize('image_info',
-                         [ImageInfo.create('bgr', 'yx', 'first')])
-@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
-@pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
-def test_read_region(slide):
-    image = slide.read_region((0, 0), 0, (256, 256))
-    assert image.dimensions == (256, 256)
-    array = image.to_array()
-    assert array.shape == (
-        3,
-        256,
-        256,
-    )
-
-
-@pytest.mark.parametrize('image_info',
-                         [ImageInfo.create('bgr', 'yx', 'first')])
-@pytest.mark.parametrize('basic_slide_cls', [EcvlSlide])
-@pytest.mark.parametrize('slide_cls', [Slide, DaskSlide])
-def test_slice_read(slide):
     image = slide.read_region((0, 0), 0, slide.dimensions)
     slide_array = slide[0][:, :]
     image_array = image.to_array()
@@ -98,13 +78,6 @@ class TestDaskMask(TestMask):
     @pytest.mark.skip(reason="update how mask are loaded/dumped")
     def test_dumps_to_tiledb(self, dask_array, tmp_path):
         super().test_dumps_to_tiledb(dask_array, tmp_path)
-
-
-@pytest.mark.parametrize('cls', [SlideArray, DaskSlideArray])
-def test_slide_array_reshape(slide_array):
-    size = slide_array.size
-    slide_array = slide_array.reshape((size[0] * size[1], 1))
-    assert slide_array.size == (size[0] * size[1], 1)
 
 
 def test_filter(mask):

@@ -1,15 +1,15 @@
 import abc
 import logging
-import math
 from datetime import datetime as dt
-from typing import Callable, Tuple
+from typing import Tuple
 
 import numpy as np
 from progress.bar import Bar
 
-from slaid.commons import BasicSlide, Mask, Slide
+from slaid.commons import Filter, Mask, NapariSlide
 from slaid.commons.base import ImageInfo
 from slaid.models import Model
+from slaid.commons.base import ArrayFactory, NumpyArrayFactory
 
 logger = logging.getLogger('classify')
 fh = logging.FileHandler('/tmp/base-classifier.log')
@@ -21,30 +21,18 @@ class InvalidChunkSize(Exception):
 
 
 class Classifier(abc.ABC):
-    @abc.abstractmethod
-    def classify(self,
-                 slide: BasicSlide,
-                 filter_=None,
-                 threshold: float = None,
-                 level: int = 2,
-                 n_batch: int = 1,
-                 round_to_0_100: bool = True,
-                 chunk: Tuple[int, int] = None) -> Mask:
-        pass
-
-
-class BasicClassifier(Classifier):
     MASK_CLASS = Mask
 
     def __init__(self,
                  model: "Model",
-                 feature: str,
-                 array_factory: Callable = np):
-        self._model = model
-        self.feature = feature
-        self._array_factory = array_factory
+                 label: str,
+                 array_factory: ArrayFactory = None):
+        self.model = model
+        self.label = label
+        self.array_factory = array_factory or NumpyArrayFactory()
+
         try:
-            self._patch_size = self._model.patch_size
+            self._patch_size = self.model.patch_size
             self._image_info = model.image_info
         except AttributeError as ex:
             logger.error(ex)
@@ -54,53 +42,102 @@ class BasicClassifier(Classifier):
                                          ImageInfo.COORD('yx'),
                                          ImageInfo.CHANNEL('last'))
 
-    @property
-    def model(self):
-        return self._model
+    @abc.abstractmethod
+    def classify(self,
+                 slide: NapariSlide,
+                 level,
+                 threshold: float = None,
+                 batch_size: int = 8,
+                 round_to_0_100: bool = True) -> Mask:
+        pass
+
+    def _get_mask(self,
+                  slide,
+                  array,
+                  level,
+                  downsample,
+                  round_to_0_100,
+                  tile_size=1):
+
+        return self.MASK_CLASS(array,
+                               level,
+                               downsample,
+                               slide.level_dimensions,
+                               round_to_0_100,
+                               model=str(self.model),
+                               tile_size=tile_size)
+
+    @staticmethod
+    def _round_to_0_100(array: np.ndarray, round_: bool) -> np.ndarray:
+        return (array * 100).astype('uint8') if round_ else array
+
+    @staticmethod
+    def _threshold(array: np.ndarray, threshold: float) -> np.ndarray:
+        if threshold is not None:
+            array[array >= threshold] = 1
+            array[array < threshold] = 0
+            return array.astype('uint8')
+        return array
+
+    def _predict(self, array):
+        if array.size == 0:
+            return np.empty((0, ))
+        return self.model.predict(array)
+
+
+class BasicClassifier(Classifier):
+
+    def __init__(self,
+                 model: "Model",
+                 feature: str,
+                 array_factory: ArrayFactory = None,
+                 _filter: Filter = None,
+                 chunk: Tuple[int, int] = None):
+        super().__init__(model, feature, array_factory)
+        self.chunk = chunk
+        self._filter = _filter
+
+    def set_filter(self, _filter: Filter):
+        self._filter = _filter
 
     def classify(self,
-                 slide: Slide,
-                 filter_=None,
+                 slide: NapariSlide,
                  threshold: float = None,
                  level: int = 2,
-                 round_to_0_100: bool = True,
-                 chunk: Tuple[int, int] = None) -> Mask:
+                 round_to_0_100: bool = True) -> Mask:
 
         slide_array = slide[level]
-        chunk = chunk or slide_array.size
+        chunk = self.chunk or slide_array.size
         dtype = 'uint8' if threshold or round_to_0_100 else 'float32'
 
         if self._patch_size:
-            predictions = self._classify_patches(slide_array, filter_, chunk,
-                                                 threshold, round_to_0_100,
-                                                 dtype)
+            predictions = self._classify_patches(slide_array, chunk, threshold,
+                                                 round_to_0_100, dtype)
         else:
-            predictions = self._classify_pixels(slide_array, filter_, chunk,
-                                                threshold, round_to_0_100,
-                                                dtype)
+            predictions = self._classify_pixels(slide_array, chunk, threshold,
+                                                round_to_0_100, dtype)
         return self._get_mask(slide, predictions, level,
-                              slide.level_downsamples[level], dt.now(),
-                              round_to_0_100)
+                              slide.level_downsamples[level], round_to_0_100)
 
-    def _classify_pixels(self, slide_array, filter_, chunk, threshold,
-                         round_to_0_100, dtype):
-        if filter_:
-            if (filter_.array == 0).all():
-                return self._array_factory.zeros(slide_array.size, dtype=dtype)
+    def _classify_pixels(self, slide_array, chunk, threshold, round_to_0_100,
+                         dtype):
+        if self._filter:
+            if (self._filter.array == 0).all():
+                return self.array_factory.zeros(slide_array.size, dtype=dtype)
 
-            filter_.rescale(slide_array.size)
-            filter_ = filter_.array
+            self._filter.rescale(slide_array.size)
+            _filter = self._filter.array
         else:
-            filter_ = np.ones(slide_array.size, dtype='bool')
+            _filter = np.ones(slide_array.size, dtype='bool')
 
-        predictions = self._array_factory.empty((0, slide_array.size[1]),
-                                                dtype=dtype)
-        with Bar('Processing', max=filter_.shape[0] // chunk[0] or 1) as bar:
-            for x in range(0, filter_.shape[0], chunk[0]):
-                row = np.empty((min(chunk[0], filter_.shape[0] - x), 0),
+        predictions = self.array_factory.empty((0, slide_array.size[1]),
+                                               dtype=dtype)
+        with Bar('Processing', max=_filter.shape[0] // chunk[0] or 1) as bar:
+            for x in range(0, _filter.shape[0], chunk[0]):
+                row = np.empty((min(chunk[0], _filter.shape[0] - x), 0),
                                dtype=dtype)
-                for y in range(0, filter_.shape[1], chunk[1]):
-                    filter_block = filter_[x:x + chunk[0], y:y + chunk[1]]
+                for y in range(0, _filter.shape[1], chunk[1]):
+                    filter_block = _filter[x:x + chunk[0], y:y + chunk[1]]
 
                     res = np.zeros(filter_block.shape, dtype='float32')
                     if (filter_block == True).any():
@@ -118,6 +155,9 @@ class BasicClassifier(Classifier):
 
         return predictions
 
+
+#
+
     @staticmethod
     def _append(array, values, axis):
         import zarr
@@ -127,36 +167,11 @@ class BasicClassifier(Classifier):
             array.append(values, axis)
             return array
 
-    @staticmethod
-    def _round_to_0_100(array: np.ndarray, round_: bool) -> np.ndarray:
-        return (array * 100).astype('uint8') if round_ else array
-
-    @staticmethod
-    def _threshold(array: np.ndarray, threshold: float) -> np.ndarray:
-        if threshold is not None:
-            array[array >= threshold] = 1
-            array[array < threshold] = 0
-            return array.astype('uint8')
-        return array
-
-    def _get_mask(self, slide, array, level, downsample, datetime,
-                  round_to_0_100):
-
-        return self.MASK_CLASS(array,
-                               level,
-                               downsample,
-                               slide.level_dimensions,
-                               datetime,
-                               round_to_0_100,
-                               model=str(self._model),
-                               tile_size=self._model.patch_size[0]
-                               if self._model.patch_size else 1)
-
-    def _classify_patches(self, slide_array, filter_, chunk, threshold,
-                          round_to_0_100, dtype):
-        predictions = self._array_factory.empty(
+    def _classify_patches(self, slide_array, chunk, threshold, round_to_0_100,
+                          dtype):
+        predictions = self.array_factory.empty(
             (0, slide_array.size[1] // self._patch_size[1]), dtype=dtype)
-        filter_ = filter_ if filter_ else np.ones(
+        _filter = self._filter if self._filter else np.ones(
             (slide_array.size[0] // self._patch_size[0],
              slide_array.size[1] // self._patch_size[1]),
             dtype='bool')
@@ -182,7 +197,7 @@ class BasicClassifier(Classifier):
                     if not col_size:
                         break
 
-                    filter_block = filter_[
+                    filter_block = _filter[
                         x // self._patch_size[0]:(x + row_size) //
                         self._patch_size[0],
                         y // self._patch_size[1]:(y + col_size) //
@@ -215,5 +230,11 @@ class BasicClassifier(Classifier):
     def _get_slide_array(self, slide, level):
         return slide[level].convert(self.model.image_info)
 
-    def _predict(self, array):
-        return self.model.predict(array)
+
+def append_array(array, values, axis):
+    import zarr
+    if isinstance(array, np.ndarray):
+        return np.append(array, values, axis)
+    elif isinstance(array, zarr.core.Array):
+        array.append(values, axis)
+        return array

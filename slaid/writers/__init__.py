@@ -9,28 +9,26 @@ REGISTRY = {}
 
 
 class Storage(abc.ABC):
+
     def __init_subclass__(cls, _name, **kwargs):
         super().__init_subclass__(**kwargs)
-        REGISTRY[_name] = cls
+        for key in _name.split(','):
+            REGISTRY[key] = cls
 
-    @abc.abstractstaticmethod
-    def dump(slide: BasicSlide,
-             output_path: str,
-             mask_name: str = None,
-             overwrite: bool = False,
-             **kwargs):
+    @abc.abstractmethod
+    def write(self, mask: Mask):
         ...
 
-    @abc.abstractstaticmethod
-    def load(path: str) -> BasicSlide:
+    @abc.abstractmethod
+    def add_metadata(self, metadata: Dict):
         ...
 
-    @abc.abstractstaticmethod
-    def empty_array(shape, dtype):
+    @abc.abstractmethod
+    def load(self) -> Mask:
         ...
 
-    @abc.abstractstaticmethod
-    def mask_exists(path: str, mask: 'str') -> bool:
+    @abc.abstractmethod
+    def mask_exists(self) -> bool:
         ...
 
 
@@ -50,6 +48,7 @@ def _dump_masks(path: str,
 
 
 class ReducedSlide(BasicSlide):
+
     def __init__(self, filename: str):
         self._filename = os.path.abspath(filename)
         self.masks: Dict[str, Mask] = {}

@@ -22,7 +22,7 @@ docker-main:
 	tests/docker/test_docker.sh
 
 install:
-	pip install -e .
+	pip install --use-feature=2020-resolver -e .
 	touch install
 
 test: install
