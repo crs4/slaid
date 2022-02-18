@@ -48,4 +48,4 @@ docker run  --rm -v $DIR/../data:/data    slaid:0.62.0-tissue_model-extract_tiss
 
 ```
 
-
+Tests data from https://openslide.cs.cmu.edu/download/openslide-testdata/Mirax/. Credits to Yves Sucaet.

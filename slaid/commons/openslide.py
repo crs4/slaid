@@ -40,6 +40,8 @@ from slaid.commons.base import BasicSlide as BaseSlide
 
 
 class Image(BaseImage):
+    IMAGE_INFO = ImageInfo.create('rgb', 'yx', 'last')
+
     def __init__(self, image: PIL_Image):
         self._image = image
 
@@ -47,32 +49,23 @@ class Image(BaseImage):
     def dimensions(self) -> Tuple[int, int]:
         return tuple(self._image.size)
 
-    def to_array(self, image_info: ImageInfo) -> np.ndarray:
+    def to_array(self, image_info: ImageInfo = None) -> np.ndarray:
         array = np.array(self._image)  # yxc, RGB
         array = array[:, :, :3]
-        if image_info.color_type == ImageInfo.COLORTYPE.BGR:
-            array = array[..., ::-1]
-        if image_info.coord == ImageInfo.COORD.XY:
-            array = np.transpose(array, [1, 0, 2])
-        if image_info.channel == ImageInfo.CHANNEL.FIRST:
-            array = np.transpose(array, [2, 0, 1])
+        if image_info is not None:
+            array = self.IMAGE_INFO.convert(array, image_info)
         return array
-        #  if PIL_FORMAT:
-        #      # convert to channel last
-        #      array = array.transpose(2, 1, 0)
-        #      # convert to rgb
-        #      array = array[:, :, ::-1]
-        #  else:
-        #      array = array.transpose(0, 2, 1)
 
 
-class Slide(BaseSlide):
+class BasicSlide(BaseSlide):
+    IMAGE_INFO = Image.IMAGE_INFO
+
     def __init__(self, filename: str):
         super().__init__(filename)
-        slide = open_slide(filename)  # not serializable...
-        self._dimensions = slide.dimensions
-        self._level_dimensions = slide.level_dimensions
-        self._level_downsamples = slide.level_downsamples
+        self._slide = open_slide(filename)  # not serializable...
+        self._dimensions = self._slide.dimensions
+        self._level_dimensions = self._slide.level_dimensions
+        self._level_downsamples = self._slide.level_downsamples
 
     def __eq__(self, other):
         return self._filename == other.filename and self.masks == other.masks
@@ -87,12 +80,10 @@ class Slide(BaseSlide):
 
     def read_region(self, location: Tuple[int, int], level: int,
                     size: Tuple[int, int]) -> BaseImage:
-        return Image(
-            open_slide(self.filename).read_region(location, level, size))
+        return Image(self._slide.read_region(location, level, size))
 
     def get_best_level_for_downsample(self, downsample: int):
-        return open_slide(
-            self.filename).get_best_level_for_downsample(downsample)
+        return self._slide.get_best_level_for_downsample(downsample)
 
     @property
     def level_dimensions(self):
