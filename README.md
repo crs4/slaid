@@ -1,5 +1,5 @@
 # Slaid
-[![Docker Image CI](https://github.com/mdrio/slaid/actions/workflows/test-build-publish.yaml/badge.svg)](https://github.com/mdrio/slaid/actions/workflows/test-build-publish.yaml)
+[![Docker Image CI](https://github.com/crs4/slaid/actions/workflows/test-build-publish.yaml/badge.svg)](https://github.com/mdrio/slaid/actions/workflows/test-build-publish.yaml)
 
 ## Intro
 Slaid is a library for applying DL models from DeepHealth project (https://deephealth-project.eu/) on WSI. 
