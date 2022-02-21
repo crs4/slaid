@@ -282,17 +282,18 @@ def test_real_case_classification(classifier, mirax_slide, chunk_size,
     subprocess.check_call(tissue_low_res)
 
     group = zarr.open(str(tmp_path / f'{os.path.basename(mirax_slide)}.zarr'))
-    output = np.array(group['tissue'])
-    expected = np.load(open('tests/data/mask_ar.npy', 'rb'))
+    output_tissue = np.array(group['tissue'])
+    expected_tissue = np.load(open('tests/data/mask_ar.npy', 'rb'))
 
     round_to_decimal = 4
-    output = np.around(output, round_to_decimal)
-    expected = np.around(expected, round_to_decimal)
+    output_tissue = np.around(output_tissue, round_to_decimal)
+    expected_tissue = np.around(expected_tissue, round_to_decimal)
 
-    assert (output == expected).all()
+    assert (output_tissue == expected_tissue).all()
 
     label = 'tumor'
     path = str(tmp_path)
+    expected_tumor_path = 'tests/data/tumor.zip'
     tumor = [
         'classify.py',
         classifier,
@@ -307,9 +308,9 @@ def test_real_case_classification(classifier, mirax_slide, chunk_size,
         '-o',
         path,
         '--filter',
-        'tissue>0.5',
+        'tissue>0.8',
         '--filter-slide',
-        os.path.join(str(tmp_path), f'{os.path.basename(mirax_slide)}.zarr'),
+        expected_tumor_path,
         '--no-round',
         mirax_slide,
     ]
@@ -320,12 +321,13 @@ def test_real_case_classification(classifier, mirax_slide, chunk_size,
     subprocess.check_call(tumor)
 
     group = zarr.open(str(tmp_path / f'{os.path.basename(mirax_slide)}.zarr'))
-    output = np.array(group[label])
-    expected = np.load(open('tests/data/heat.npy', 'rb'))
+    output_tumor = np.array(group[label])
+    expected_tumor = np.array(zarr.open(expected_tumor_path)['tumor'])
 
-    round_to_decimal = 5
-    output = np.around(output, round_to_decimal)
-    expected = np.around(expected, round_to_decimal)
+    round_to_decimal = 4
+    output_tumor = np.around(output_tumor, round_to_decimal)
+    expected_tumor = np.around(expected_tumor, round_to_decimal)
+    assert (output_tumor == expected_tumor).all()
 
 
 if __name__ == '__main__':
