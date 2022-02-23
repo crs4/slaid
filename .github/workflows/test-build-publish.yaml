@@ -29,7 +29,6 @@ jobs:
     - run: conda install -c dhealth -c bioconda -c conda-forge pyecvl-cpu==${{ steps.get_pyecvl_version.outputs.pyecvl-version }}
     - run: export PATH=/opt/conda/bin:$PATH && pip install pytest wheel
 
-
     - name: test
       run: make test
 

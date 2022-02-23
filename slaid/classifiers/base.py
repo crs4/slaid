@@ -38,9 +38,9 @@ class Classifier(abc.ABC):
             logger.error(ex)
             raise ex
             self._patch_size = None
-            self._image_info = ImageInfo(ImageInfo.COLORTYPE('rgb'),
-                                         ImageInfo.COORD('yx'),
-                                         ImageInfo.CHANNEL('last'))
+            self._image_info = ImageInfo(ImageInfo.ColorType('rgb'),
+                                         ImageInfo.Coord('yx'),
+                                         ImageInfo.Channel('last'))
 
     @abc.abstractmethod
     def classify(self,
