@@ -1,17 +1,13 @@
 import logging
 import os
-from urllib.parse import urlparse
-from urllib.request import urlretrieve
 
 import slaid.models.eddl as eddl
 from slaid.models import Factory as BaseFactory
 from slaid.models import Model
 from slaid.models.commons import Factory as CommonFactory
+from slaid.utils import retrieve_model
 
 logger = logging.getLogger()
-
-model_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                         '../resources/models')
 
 
 class Factory(BaseFactory):
@@ -48,24 +44,3 @@ class Factory(BaseFactory):
             gpu,
         )
         return factory
-
-
-def retrieve_model(uri: str) -> str:
-    local_path: str
-
-    parsed = urlparse(uri)
-    if parsed.scheme in {'http', 'https'}:
-        logger.info('retrieving remote model from %s', uri)
-        local_path = os.path.join(model_dir, os.path.basename(parsed.path))
-        if not os.path.exists(local_path):
-            urlretrieve(uri, local_path)
-    elif parsed.scheme in {'file', ''}:
-        local_path = uri
-    else:
-        raise UnsupportedScheme(parsed.scheme)
-
-    return local_path
-
-
-class UnsupportedScheme(Exception):
-    ...

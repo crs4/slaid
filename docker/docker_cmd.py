@@ -4,7 +4,7 @@ import logging
 import os
 import subprocess
 
-from slaid.models.factory import retrieve_model
+from slaid.utils import retrieve_model
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -132,7 +132,7 @@ def get_models():
     with open("filter-models.txt", "r") as f_obj:
         models = f_obj.read().splitlines()
     for model_path in models:
-        model_path = retrieve_model(model_path)
+        model_path = os.path.basename(retrieve_model(model_path))
         model_no_ext = os.path.splitext(model_path)[0]
         yield os.path.basename(model_path), model_no_ext
 
