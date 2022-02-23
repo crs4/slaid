@@ -98,7 +98,7 @@ class PixelClassifier(Classifier):
 
         res = self.array_factory.empty(slide_array.size, dtype=dtype)
 
-        channel_first = self.model.image_info.CHANNEL == ImageInfo.CHANNEL.FIRST
+        channel_first = self.model.image_info.channel == ImageInfo.Channel.FIRST
         batch_iterator = BatchIterator(batch_size, channel_first)
         row_splitter = RowSplitter(slide_array.size[1])
 
@@ -225,7 +225,7 @@ class FilteredPixelClassifier(FilteredClassifier):
         to_predict = np.concatenate(patches) if patches else np.empty(
             (0, 3), dtype='uint8')
         channel_first = (
-            self.model.image_info.CHANNEL == ImageInfo.CHANNEL.FIRST)
+            self.model.image_info.channel == ImageInfo.Channel.FIRST)
         batch_iterator = BatchIterator(batch_size, channel_first)
         batch_iterator.append(to_predict)
 
