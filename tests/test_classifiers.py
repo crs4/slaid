@@ -7,7 +7,7 @@ from slaid.classifiers.fixed_batch import (FilteredPatchClassifier,
                                            FilteredPixelClassifier,
                                            PixelClassifier)
 from slaid.commons import Mask
-from slaid.commons.base import Filter, Slide
+from slaid.commons.base import Filter, Slide, ImageInfo
 from slaid.commons.dask import init_client
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.commons.openslide import BasicSlide as OpenSlide
@@ -150,21 +150,17 @@ def test_classify_slide_by_patches_with_filter(classifier_cls, slide, level,
     assert (mask.array[2:, :] == 0).all()
 
 
+@pytest.mark.parametrize(
+    "model_filename",
+    ['slaid/resources/models/promort_vgg16_weights_ep_9_vacc_0.85.bin'])
 @pytest.mark.parametrize("classifier_cls", [FilteredPatchClassifier])
 @pytest.mark.parametrize("slide_path", ["tests/data/patch.tif"])
 @pytest.mark.parametrize("slide_cls,args", [(Slide, (EcvlSlide, )),
                                             (Slide, (OpenSlide, ))])
-@pytest.mark.parametrize(
-    "model",
-    [
-        TumorModel(
-            "slaid/resources/models/promort_vgg16_weights_ep_9_vacc_0.85.bin")
-    ],
-)
 @pytest.mark.parametrize("array_factory", [ZarrStorage])
-def test_classifies_tumor(slide, classifier_cls, model, array_factory,
+def test_classifies_tumor(slide, classifier_cls, tumor_model, array_factory,
                           tmp_path):
-    classifier = classifier_cls(model,
+    classifier = classifier_cls(tumor_model,
                                 "test",
                                 Filter(None, np.ones((1, 1), dtype="bool")),
                                 array_factory=array_factory(
@@ -175,13 +171,15 @@ def test_classifies_tumor(slide, classifier_cls, model, array_factory,
     assert round(float(mask.array[0]), 4) == round(1 - 0.11082522, 4)
 
 
+@pytest.mark.parametrize("model_filename", [
+    "slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin",
+    "slaid/resources/models/tissue_model-eddl-1.1.onnx"
+])
 @pytest.mark.parametrize("slide_path", ["tests/data/patch.tif"])
 @pytest.mark.parametrize("slide_cls,args", [(Slide, (EcvlSlide, )),
                                             (Slide, (OpenSlide, ))])
-def test_classifies_tissue(slide, patch_tissue_mask):
-    model = TissueModel(
-        "slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin")
-    classifier = PixelClassifier(model, "tissue")
+def test_classifies_tissue(slide, tissue_model, patch_tissue_mask):
+    classifier = PixelClassifier(tissue_model, "tissue")
     mask = classifier.classify(slide, level=0, round_to_0_100=False)
     assert (mask.array == patch_tissue_mask).all()
 
@@ -195,7 +193,7 @@ def test_classifies_tissue(slide, patch_tissue_mask):
     )
     filter_array[:2, :2] = 1
 
-    filter_classifier = FilteredPixelClassifier(model, "tissue",
+    filter_classifier = FilteredPixelClassifier(tissue_model, "tissue",
                                                 Filter(None, filter_array))
     mask = filter_classifier.classify(
         slide,
@@ -205,6 +203,15 @@ def test_classifies_tissue(slide, patch_tissue_mask):
 
     assert (mask.array[:16, :16] == patch_tissue_mask[:16, :16]).all()
 
+
+#  @pytest.mark.parametrize("model_filename", [
+#      'https://space.crs4.it/s/GcCd8EQx5W84zrK/download/tumor_model-level_1-v2.1.onnx'
+#  ])
+#  def test_tumor_model(tumor_model, patch_array):
+#      image_info = ImageInfo.create('bgr', 'xy', 'first', '0_255')
+#      patch_array = image_info.convert(patch_array, tumor_model.image_info)
+#      prediction = tumor_model.predict(patch_array)
+#      assert round(float(prediction[0]), 4) == 0.9998
 
 if __name__ == "__main__":
     init_client()

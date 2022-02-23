@@ -32,26 +32,41 @@ def get_class(name, module):
 @dataclass
 class ImageInfo:
 
-    class COLORTYPE(Enum):
+    class ColorType(Enum):
         RGB = 'rgb'
         BGR = 'bgr'
 
-    class COORD(Enum):
+    class Coord(Enum):
         XY = 'xy'
         YX = 'yx'
 
-    class CHANNEL(Enum):
+    class Channel(Enum):
         FIRST = 'first'
         LAST = 'last'
 
-    color_type: COLORTYPE
-    coord: COORD
-    channel: CHANNEL
+    class Range(Enum):
+        _0_1 = '0_1'
+        _1_1 = '1_1'
+        _0_255 = '0_255'
+
+    color_type: ColorType
+    coord: Coord
+    channel: Channel
+    pixel_range: Range = Range._0_255
+
+    _range_conversion_dict = {
+        '0_255->0_1': lambda array: array / 255.,
+        '0_255->1_1': lambda array: (array / 255.) * 2 - 1
+    }
 
     @staticmethod
-    def create(color_type: str, coord: str, channel: str) -> "ImageInfo":
-        return ImageInfo(ImageInfo.COLORTYPE(color_type),
-                         ImageInfo.COORD(coord), ImageInfo.CHANNEL(channel))
+    def create(color_type: str,
+               coord: str,
+               channel: str,
+               pixel_range: str = '0_255') -> "ImageInfo":
+        return ImageInfo(ImageInfo.ColorType(color_type),
+                         ImageInfo.Coord(coord), ImageInfo.Channel(channel),
+                         ImageInfo.Range(pixel_range))
 
     def convert(self, array: np.ndarray,
                 array_image_info: "ImageInfo") -> np.ndarray:
@@ -59,16 +74,24 @@ class ImageInfo:
             return array
 
         if self.color_type != array_image_info.color_type:
-            if self.channel == ImageInfo.CHANNEL.FIRST:
+            if self.channel == ImageInfo.Channel.FIRST:
                 array = array[::-1, ...]
             else:
                 array = array[..., ::-1]
 
         if self.channel != array_image_info.channel:
-            if self.channel == ImageInfo.CHANNEL.FIRST:
+            if self.channel == ImageInfo.Channel.FIRST:
                 array = array.transpose(1, 2, 0)
             else:
                 array = array.transpose(2, 0, 1)
+        try:
+            key = f'{self.pixel_range.value}->{array_image_info.pixel_range.value}'
+            array = self._range_conversion_dict[key](array)
+        except KeyError:
+            if self.pixel_range != array_image_info.pixel_range:
+                raise RuntimeError(
+                    f'conversion not available from {self.pixel_range} to {array_image_info.pixel_range}'
+                )
 
         return array
 
@@ -383,7 +406,7 @@ class BasicSlideArray(SlideArray):
         return slide_array
 
     def _is_channel_first(self):
-        return self.image_info.channel == ImageInfo.CHANNEL.FIRST
+        return self.image_info.channel == ImageInfo.Channel.FIRST
 
 
 class NapariSlide(BasicSlide):
@@ -460,7 +483,7 @@ class NapariSlideArray:
         return np.array(self._array)
 
     def _is_channel_first(self):
-        return self._image_info.channel == ImageInfo.CHANNEL.FIRST
+        return self._image_info.channel == ImageInfo.Channel.FIRST
 
     @property
     def size(self) -> Tuple[int, int]:
@@ -520,9 +543,9 @@ def _create_metastore(slide: BasicSlide, tilesize: int) -> Dict[str, bytes]:
             store,
             path=str(i),
             shape=(3, y, x) if slide.IMAGE_INFO.channel
-            == ImageInfo.CHANNEL.FIRST else (y, x, 3),
+            == ImageInfo.Channel.FIRST else (y, x, 3),
             chunks=(3, tilesize, tilesize) if slide.IMAGE_INFO.channel
-            == ImageInfo.CHANNEL.FIRST else (tilesize, tilesize, 3),
+            == ImageInfo.Channel.FIRST else (tilesize, tilesize, 3),
             dtype="|u1",
             compressor=None,
         )
@@ -579,7 +602,7 @@ class SlideStore(OpenSlideStore):
         """Returns x,y chunk coords and pyramid level from string key"""
         level, ckey = path.split("/")
         _, y, x = map(int, ckey.split("."))
-        if self._slide.IMAGE_INFO.channel == ImageInfo.CHANNEL.LAST:
+        if self._slide.IMAGE_INFO.channel == ImageInfo.Channel.LAST:
             y, x, _ = _, y, x
         return x, y, int(level)
 

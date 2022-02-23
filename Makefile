@@ -32,7 +32,7 @@ test: install
 
 docker-per-model:
 	mkdir -p docker-build
-	cd docker; ./docker_cmd.py -v $(TAG) $(DOCKER_ARGS) build --build-arg $(BUILD_ARG) -e $(EXTRA_TAGS)
+	PYTHONPATH=$(PYTHONPATH):$(PWD)/ cd docker; ./docker_cmd.py -v $(TAG) $(DOCKER_ARGS) build --build-arg $(BUILD_ARG) -e $(EXTRA_TAGS)
 clean:
 	rm -f install
 	rm -f test
