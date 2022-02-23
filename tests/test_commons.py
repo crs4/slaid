@@ -34,7 +34,7 @@ def test_slice_slide(slide, image_info):
         slide_array = slide[i]
         expected_shape = (
             3, 10,
-            20) if image_info.channel == ImageInfo.CHANNEL.FIRST else (10, 20,
+            20) if image_info.channel == ImageInfo.Channel.FIRST else (10, 20,
                                                                        3)
         sliced_array = slide_array[:10, :20]
         sliced_array = sliced_array.convert(image_info)
