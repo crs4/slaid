@@ -13,8 +13,7 @@ from slaid.commons.dask import Slide as DaskSlide
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.commons.factory import MetaSlideFactory
 from slaid.models.dask import ActorModel
-#  from slaid.commons.openslide import Slide as OpenSlide
-from slaid.models.eddl import load_model
+from slaid.models.factory import Factory
 from tests.commons import DummyModel, EddlGreenPatchModel, GreenModel
 
 
@@ -84,9 +83,14 @@ def patch_tissue_mask(request):
 
 
 @pytest.fixture
-def tissue_model():
-    return load_model(
-        'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin')
+def tumor_model(model_filename):
+    return Factory(model_filename, cls_name='TumorModel').get_model()
+
+
+@pytest.fixture
+def tissue_model(model_filename):
+    return Factory(model_filename, 'eddl', gpu=None,
+                   cls_name='TissueModel').get_model()
 
 
 @pytest.fixture
@@ -173,3 +177,9 @@ def green_slide_and_patch_classifier(backend, slide_cls, image_info):
 @pytest.fixture
 def mask():
     return Mask(np.arange(9).reshape((3, 3)), 0, 1, [(3, 3)])
+
+
+@pytest.fixture
+def patch_array():
+    patch_array = np.load(open('tests/data/patch.npy', 'rb'))
+    return patch_array
