@@ -4,7 +4,7 @@ import logging
 import os
 import subprocess
 
-from slaid.models.factory import retrieve_model
+from slaid.utils import retrieve_model
 
 logging.basicConfig(level=logging.DEBUG)
 
