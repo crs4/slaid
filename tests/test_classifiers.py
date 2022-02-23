@@ -204,14 +204,14 @@ def test_classifies_tissue(slide, tissue_model, patch_tissue_mask):
     assert (mask.array[:16, :16] == patch_tissue_mask[:16, :16]).all()
 
 
-@pytest.mark.parametrize(
-    "model_filename", ['slaid/resources/models/tumor_model-level_1-v2.1.onnx'])
-def test_tumor_model(tumor_model, patch_array):
-    image_info = ImageInfo.create('bgr', 'xy', 'first', '0_255')
-    patch_array = image_info.convert(patch_array, tumor_model.image_info)
-    prediction = tumor_model.predict(patch_array)
-    assert round(float(prediction[0]), 4) == 1
-
+#  @pytest.mark.parametrize("model_filename", [
+#      'https://space.crs4.it/s/GcCd8EQx5W84zrK/download/tumor_model-level_1-v2.1.onnx'
+#  ])
+#  def test_tumor_model(tumor_model, patch_array):
+#      image_info = ImageInfo.create('bgr', 'xy', 'first', '0_255')
+#      patch_array = image_info.convert(patch_array, tumor_model.image_info)
+#      prediction = tumor_model.predict(patch_array)
+#      assert round(float(prediction[0]), 4) == 0.9998
 
 if __name__ == "__main__":
     init_client()
