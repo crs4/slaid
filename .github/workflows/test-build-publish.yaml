@@ -53,9 +53,6 @@ jobs:
       with:
         fetch-depth: '0'
 
-    - name: install
-      run: make install
-
     - name: update VERSION file
       run: echo  "${{ needs.test.outputs.tag }}" > VERSION
 
