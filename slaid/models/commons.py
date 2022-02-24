@@ -4,7 +4,7 @@ import numpy as np
 from pyeddl.tensor import Tensor
 import pickle
 
-from slaid.commons import NapariSlide
+from slaid.commons import Slide
 from slaid.commons.base import Image, ImageInfo
 from slaid.models.base import Factory as BaseFactory
 from slaid.models.base import Model as BaseModel
@@ -87,7 +87,7 @@ class DummyModel(BaseDummyModel):
         return self.func(array.shape[0])
 
 
-class DummySlide(NapariSlide):
+class DummySlide(Slide):
 
     def __init__(self,
                  level_dimensions: List[Tuple[int, int]],

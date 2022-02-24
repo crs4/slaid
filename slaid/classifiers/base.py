@@ -1,12 +1,11 @@
 import abc
 import logging
-from datetime import datetime as dt
 from typing import Tuple
 
 import numpy as np
 from progress.bar import Bar
 
-from slaid.commons import Filter, Mask, NapariSlide
+from slaid.commons import Filter, Mask, Slide
 from slaid.commons.base import ImageInfo
 from slaid.models import Model
 from slaid.commons.base import ArrayFactory, NumpyArrayFactory
@@ -44,7 +43,7 @@ class Classifier(abc.ABC):
 
     @abc.abstractmethod
     def classify(self,
-                 slide: NapariSlide,
+                 slide: Slide,
                  level,
                  threshold: float = None,
                  batch_size: int = 8,
@@ -101,7 +100,7 @@ class BasicClassifier(Classifier):
         self._filter = _filter
 
     def classify(self,
-                 slide: NapariSlide,
+                 slide: Slide,
                  threshold: float = None,
                  level: int = 2,
                  round_to_0_100: bool = True) -> Mask:

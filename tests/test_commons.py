@@ -2,11 +2,8 @@ import unittest
 
 import numpy as np
 import pytest
-import tiledb
 
-from slaid.commons import Mask
 from slaid.commons.base import ImageInfo, Slide
-from slaid.commons.dask import Mask as DaskMask
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.commons.openslide import BasicSlide as OpenSlide
 
@@ -49,35 +46,6 @@ def test_slice_slide(slide, image_info):
     slide_array = slide[0][:, :]
     image_array = image.to_array()
     assert (slide_array.array == image_array).all()
-
-
-class TestMask:
-    cls = Mask
-
-    @pytest.mark.skip(reason="update how mask are loaded/dumped")
-    def test_dumps_to_tiledb(self, array, tmp_path):
-        mask = self.cls(array, 1, 1, 0.8, False)
-        mask.to_tiledb(str(tmp_path))
-        with tiledb.open(str(tmp_path), 'r') as array:
-            assert (array == np.array(mask.array)).all()
-            assert array.meta['extraction_level'] == mask.extraction_level
-            assert array.meta['level_downsample'] == mask.level_downsample
-            assert array.meta['threshold'] == mask.threshold
-            assert 'model' not in array.meta.keys()
-
-    @pytest.mark.skip(reason="update how mask are loaded/dumped")
-    def test_creates_from_tiledb(self, tiledb_path):
-        mask = self.cls.from_tiledb(tiledb_path)
-        with tiledb.open(tiledb_path, 'r') as array:
-            assert (mask.array[:] == array[:]).all()
-
-
-class TestDaskMask(TestMask):
-    cls = DaskMask
-
-    @pytest.mark.skip(reason="update how mask are loaded/dumped")
-    def test_dumps_to_tiledb(self, dask_array, tmp_path):
-        super().test_dumps_to_tiledb(dask_array, tmp_path)
 
 
 def test_filter(mask):

@@ -19,7 +19,7 @@ from slaid.commons.base import Filter
 from slaid.models.factory import Factory as ModelFactory
 from slaid.models.base import Model
 from slaid.writers import REGISTRY as STORAGE
-from slaid.writers.zarr import ZarrStorage
+from slaid.writers.zarr_io import ZarrStorage
 
 DEFAULT_BATCH_SIZE = 8192
 

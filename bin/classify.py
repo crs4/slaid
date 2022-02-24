@@ -5,7 +5,6 @@ import os
 
 import clize
 import pkg_resources
-import tiledb
 
 from slaid.runners import fixed_batch
 
@@ -21,15 +20,6 @@ def set_model(func, model):
         return func(*args, model=model, **kwargs)
 
     return wrapper
-
-
-def load_config_file(config_file: str, backend: str):
-    if config_file is None:
-        return
-    if backend == 'tiledb':
-        config = tiledb.Config.load(config_file)
-        tiledb.Ctx(config)
-        tiledb.VFS(config)
 
 
 if __name__ == '__main__':
