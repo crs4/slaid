@@ -27,7 +27,7 @@ def get_input_output(output, slide_path=input_):
     return slide, zarr_group
 
 
-def _test_output(feature, output, slide, level, tile_size=1):
+def _test_output(feature, output, slide, level, model, tile_size=1):
     assert output.attrs['filename'] == slide.filename
     assert tuple(output.attrs['resolution']) == slide.dimensions
     level_dims = slide.level_dimensions[level][::-1]
@@ -38,6 +38,7 @@ def _test_output(feature, output, slide, level, tile_size=1):
         'level_downsample'] == slide.level_downsamples[level]
 
     assert output[feature].attrs['tile_size'] == tile_size
+    assert output[feature].attrs['model'] == os.path.basename(model)
 
 
 @pytest.mark.parametrize('classifier', ['fixed-batch'])
@@ -62,7 +63,7 @@ def test_classify(classifier, tmp_path, model, chunk, level):
     output_path = os.path.join(path, f'{input_basename}.zarr')
     slide, output = get_input_output(output_path)
 
-    _test_output(label, output, slide, 2)
+    _test_output(label, output, slide, 2, model)
     assert output[label].dtype == 'uint8'
 
 
@@ -247,7 +248,7 @@ def test_classifies_patches(slide, classifier, tmp_path, model):
     output_path = os.path.join(path, f'{os.path.basename(slide)}.zarr')
     slide, output = get_input_output(output_path, slide)
 
-    _test_output(label, output, slide, 0, 256)
+    _test_output(label, output, slide, 0, model, 256)
     assert output[label].dtype == 'uint8'
 
 

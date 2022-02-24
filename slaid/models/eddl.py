@@ -45,7 +45,7 @@ class Model(BaseModel, ABC):
         return self._weight_filename
 
     def __str__(self):
-        return str(self._weight_filename)
+        return self.name
 
     @property
     def gpu(self) -> List:
@@ -155,7 +155,7 @@ class Factory(BaseFactory):
         net = cls.create_net()
         self._build_net(net)
         eddl.load(net, self.filename, "bin")
-        return globals()[cls_name](net)
+        return globals()[cls_name](net, name=os.path.basename(self.filename))
 
     def _build_net(self, net):
         eddl.build(net,
