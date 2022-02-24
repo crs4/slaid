@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import glob
 import logging
 import os
 import subprocess
+
+from slaid.utils import retrieve_model
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -49,8 +50,7 @@ def build(
                 tag=tag,
                 build_args=[f"MODEL={model_path}"] + build_args,
                 docker_args=docker_args,
-            )
-        )
+            ))
 
     for kwargs in kwargs_list:
         docker_build(**kwargs)
@@ -65,17 +65,12 @@ def docker_build(
     dockerfile="Dockerfile",
 ):
     build_args = build_args or []
-    build_args = (
-        f'{" ".join(["--build-arg " + arg for arg in build_args])}'
-        if build_args
-        else ""
-    )
-    command = (
-        f"docker {docker_args}  build -f {dockerfile} "
-        f'-t {image}{":" + tag if tag else ""} '
-        f"{build_dir} "
-        f"{build_args}"
-    )
+    build_args = (f'{" ".join(["--build-arg " + arg for arg in build_args])}'
+                  if build_args else "")
+    command = (f"docker {docker_args}  build -f {dockerfile} "
+               f'-t {image}{":" + tag if tag else ""} '
+               f"{build_dir} "
+               f"{build_args}")
 
     logging.debug(command)
     subprocess.run(command, shell=True, check=True)
@@ -88,17 +83,18 @@ def push(image, **kwargs):
 
 
 def docker_push(image, tag, repo, docker_args=""):
-    command = (
-        f'docker {docker_args} push {repo + "/" if repo else ""}{image}'
-        f'{":" + tag if tag else ""}'
-    )
+    command = (f'docker {docker_args} push {repo + "/" if repo else ""}{image}'
+               f'{":" + tag if tag else ""}')
     logging.debug(command)
     subprocess.run(command, shell=True, check=True)
 
 
 def tag(repo, image="slaid", lib_version="", docker_args="", extra_tags=None):
     kwargs_list = [
-        dict(repo=repo, image=image, tag=f"{lib_version}", docker_args=docker_args)
+        dict(repo=repo,
+             image=image,
+             tag=f"{lib_version}",
+             docker_args=docker_args)
     ]
 
     for _, model_name in get_models():
@@ -109,8 +105,7 @@ def tag(repo, image="slaid", lib_version="", docker_args="", extra_tags=None):
                 image=image,
                 tag=tag,
                 docker_args=docker_args,
-            )
-        )
+            ))
 
     for kwargs in kwargs_list:
         print(docker_tag(**kwargs))
@@ -136,9 +131,12 @@ def _get_tag(lib_version, model_name, extra_tags=None):
 def get_models():
     with open("filter-models.txt", "r") as f_obj:
         models = f_obj.read().splitlines()
-    for model in models:
-        model_no_ext = os.path.splitext(model)[0]
-        yield model, model_no_ext
+    for model_path in models:
+        model_path = os.path.basename(
+            retrieve_model(model_path,
+                           '../docker-build/slaid/resources/models'))
+        model_no_ext = os.path.splitext(model_path)[0]
+        yield os.path.basename(model_path), model_no_ext
 
 
 if __name__ == "__main__":
@@ -146,22 +144,25 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", dest="lib_version", default="")
-    parser.add_argument(
-        "-a", dest="docker_args", help="docker args like host, ect.", default=""
-    )
+    parser.add_argument("-a",
+                        dest="docker_args",
+                        help="docker args like host, ect.",
+                        default="")
     subparsers = parser.add_subparsers()
 
     build_parser = subparsers.add_parser("build")
     build_parser.set_defaults(func=build)
-    build_parser.add_argument("-d", dest="docker_build_dir", default="../docker-build")
+    build_parser.add_argument("-d",
+                              dest="docker_build_dir",
+                              default="../docker-build")
 
     comma_separated_list_handler = lambda s: [i for i in s.split(",")]
-    build_parser.add_argument(
-        "-e", dest="extra_tags", type=comma_separated_list_handler
-    )
-    build_parser.add_argument(
-        "--build-args", dest="build_args", type=comma_separated_list_handler
-    )
+    build_parser.add_argument("-e",
+                              dest="extra_tags",
+                              type=comma_separated_list_handler)
+    build_parser.add_argument("--build-args",
+                              dest="build_args",
+                              type=comma_separated_list_handler)
 
     push_parser = subparsers.add_parser("push")
     push_parser.add_argument("image", action="append")
@@ -169,7 +170,9 @@ if __name__ == "__main__":
 
     tag_parser = subparsers.add_parser("tag")
     tag_parser.add_argument("-r", dest="repo")
-    tag_parser.add_argument("-e", dest="extra_tags", type=comma_separated_list_handler)
+    tag_parser.add_argument("-e",
+                            dest="extra_tags",
+                            type=comma_separated_list_handler)
     tag_parser.set_defaults(func=tag)
 
     args = parser.parse_args()

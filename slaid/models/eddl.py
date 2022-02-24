@@ -1,9 +1,11 @@
 import logging
 import os
-from abc import ABC, abstractstaticmethod
+from abc import ABC
+from dataclasses import dataclass
 from typing import List
 
 import numpy as np
+import onnx
 import pyeddl.eddl as eddl
 import stringcase
 from pyeddl.tensor import Tensor
@@ -17,70 +19,41 @@ fh = logging.FileHandler('/tmp/eddl.log')
 logger.addHandler(fh)
 
 
-class Factory(BaseFactory):
-
-    def __init__(self, filename: str, gpu: List[int]):
-        super().__init__(filename)
-        self._gpu = gpu
-
-    def get_model(self):
-        basename = os.path.basename(self._filename)
-        cls_name = basename.split('-')[0]
-        cls_name = stringcase.capitalcase(stringcase.camelcase(cls_name))
-        return globals()[cls_name](self._filename, self._gpu)
-
-
 class Model(BaseModel, ABC):
     patch_size = None
-    image_info = ImageInfo(ImageInfo.COLORTYPE.BGR, ImageInfo.COORD.YX,
-                           ImageInfo.CHANNEL.FIRST)
-    normalization_factor = 1
+    default_image_info = ImageInfo(
+        ImageInfo.ColorType.BGR,
+        ImageInfo.Coord.YX,
+        ImageInfo.Channel.FIRST,
+    )
     index_prediction = 1
 
-    def __init__(self, weight_filename, gpu: List = None):
+    def __init__(self,
+                 net: eddl.Model,
+                 weight_filename: str = None,
+                 gpu: List = None,
+                 image_info: ImageInfo = None,
+                 name: str = None):
+        self._net = net
         self._weight_filename = weight_filename
         self._gpu = gpu
-        self._model_ = None
+        self.image_info = image_info or self.default_image_info
+        super().__init__(name)
 
     @property
     def weight_filename(self):
         return self._weight_filename
 
-    def _get_model(self):
-        if self._model_ is None:
-            self._create_model()
-        return self._model_
-
-    def _set_model(self, value):
-        self._model_ = value
-
-    _model = property(_get_model, _set_model)
-
     def __str__(self):
-        return self._weight_filename
+        return str(self._weight_filename)
 
-    def _set_gpu(self, value: List):
-        self._gpu = value
-        self._model = None
-
-    def _get_gpu(self) -> List:
+    @property
+    def gpu(self) -> List:
         return self._gpu
 
-    gpu = property(_get_gpu, _set_gpu)
-
-    def _create_model(self):
-        net = self._create_net()
-        eddl.build(
-            net, eddl.rmsprop(0.00001), ["soft_cross_entropy"],
-            ["categorical_accuracy"],
-            eddl.CS_GPU(self.gpu, mem="low_mem")
-            if self.gpu else eddl.CS_CPU())
-        eddl.load(net, self._weight_filename, "bin")
-        self._model_ = net
-
-    @abstractstaticmethod
-    def _create_net():
-        pass
+    @property
+    def net(self):
+        return self._net
 
     def predict(self, array: np.ndarray) -> np.ndarray:
         predictions = self._predict(array)
@@ -93,24 +66,19 @@ class Model(BaseModel, ABC):
         return flat_mask
 
     def _predict(self, array: np.ndarray) -> List[Tensor]:
-        tensor = Tensor.fromarray(array / self.normalization_factor)
-        prediction = eddl.predict(self._model, [tensor])
+        tensor = Tensor.fromarray(array)
+        prediction = eddl.predict(self._net, [tensor])
         return prediction
-
-    def __getstate__(self):
-        return dict(weight_filename=self._weight_filename, gpu=self._gpu)
-
-    def __setstate__(self, state):
-        self.__init__(**state)
 
 
 class TissueModel(Model):
     index_prediction = 1
-    image_info = ImageInfo(ImageInfo.COLORTYPE.RGB, ImageInfo.COORD.YX,
-                           ImageInfo.CHANNEL.LAST)
+    default_image_info = ImageInfo(ImageInfo.ColorType.RGB, ImageInfo.Coord.YX,
+                                   ImageInfo.Channel.LAST,
+                                   ImageInfo.Range._0_255)
 
     @staticmethod
-    def _create_net():
+    def create_net():
         in_ = eddl.Input([3])
         layer = in_
         layer = eddl.ReLu(eddl.Dense(layer, 50))
@@ -123,11 +91,13 @@ class TissueModel(Model):
 
 class TumorModel(Model):
     patch_size = (256, 256)
-    normalization_factor = 255
     index_prediction = 1
+    default_image_info = ImageInfo(ImageInfo.ColorType.BGR, ImageInfo.Coord.YX,
+                                   ImageInfo.Channel.FIRST,
+                                   ImageInfo.Range._0_1)
 
     @staticmethod
-    def _create_net():
+    def create_net():
         in_size = [256, 256]
         num_classes = 2
         in_ = eddl.Input([3, in_size[0], in_size[1]])
@@ -162,8 +132,77 @@ class TumorModel(Model):
         return x
 
 
-def load_model(weight_filename: str, gpu: List[int] = None) -> Model:
-    basename = os.path.basename(weight_filename)
-    cls_name = basename.split('-')[0]
-    cls_name = stringcase.capitalcase(stringcase.camelcase(cls_name))
-    return globals()[cls_name](weight_filename, gpu)
+def to_onnx(model: Model, filename: str):
+    eddl.save_net_to_onnx_file(model.net, filename)
+
+
+@dataclass
+class Factory(BaseFactory):
+    filename: str
+    cls_name: str = None
+    gpu: List[int] = None
+    learn_rate = 1e-5
+    list_of_losses: List[str] = None
+    list_of_metrics: List[str] = None
+
+    def __post_init__(self):
+        self.list_of_losses = self.list_of_losses or ["soft_cross_entropy"]
+        self.list_of_metrics = self.list_of_metrics or ["categorical_accuracy"]
+
+    def get_model(self):
+        cls_name = self._get_cls_name()
+        cls = globals()[cls_name]
+        net = cls.create_net()
+        self._build_net(net)
+        eddl.load(net, self.filename, "bin")
+        return globals()[cls_name](net)
+
+    def _build_net(self, net):
+        eddl.build(net,
+                   eddl.rmsprop(self.learn_rate),
+                   self.list_of_losses,
+                   self.list_of_metrics,
+                   eddl.CS_GPU(self.gpu, mem="low_mem")
+                   if self.gpu else eddl.CS_CPU(),
+                   init_weights=False)
+
+    def _get_cls_name(self):
+        if self.cls_name:
+            cls_name = self.cls_name
+        else:
+            basename = os.path.basename(self.filename)
+            cls_name = basename.split('-')[0]
+            cls_name = stringcase.capitalcase(stringcase.camelcase(cls_name))
+        return cls_name
+
+
+@dataclass
+class OnnxFactory(Factory):
+
+    def get_model(self):
+        net = eddl.import_net_from_onnx_file(self.filename)
+        self._build_net(net)
+
+        cls_name = self._get_cls_name()
+        cls = globals()[cls_name]
+
+        image_info = self._update_image_info(cls.default_image_info)
+        return cls(net,
+                   image_info=image_info,
+                   name=os.path.basename(self.filename))
+
+    def _update_image_info(self, image_info: ImageInfo) -> ImageInfo:
+
+        image_info = ImageInfo(color_type=image_info.color_type,
+                               coord=image_info.coord,
+                               channel=image_info.channel,
+                               pixel_range=image_info.pixel_range)
+        onnx_model = onnx.load(self.filename)
+        for prop in onnx_model.metadata_props:
+            if prop.key == "Image.BitmapPixelFormat":
+                color_type = prop.value[:3].lower()
+                image_info.color_type = ImageInfo.ColorType(color_type)
+            if prop.key == "Image.NominalPixelRange":
+                pixel_range = prop.value.split('_', 1)[1]
+                image_info.pixel_range = ImageInfo.Range(pixel_range)
+        return image_info

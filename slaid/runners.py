@@ -17,6 +17,7 @@ from slaid.classifiers.fixed_batch import (FilteredPatchClassifier,
 from slaid.commons import ImageInfo
 from slaid.commons.base import Filter
 from slaid.models.factory import Factory as ModelFactory
+from slaid.models.base import Model
 from slaid.writers import REGISTRY as STORAGE
 from slaid.writers.zarr import ZarrStorage
 
@@ -53,7 +54,7 @@ class SlideFactory:
 class Runner(abc.ABC):
     input_path: str
     output_dir: str
-    model_name: str
+    model: Model
     level: int
     label: str
     writer: str
@@ -66,8 +67,6 @@ class Runner(abc.ABC):
     batch_size: int = None
 
     def __post_init__(self):
-        self.gpu = _convert_gpu_params(self.gpu)
-        self.model = ModelFactory(self.model_name, gpu=self.gpu).get_model()
 
         _prepare_output_dir(self.output_dir)
         self._classifier = None
@@ -260,8 +259,8 @@ def fixed_batch(input_path: str,
                                                       'openslide')) = 'ecvl',
                 chunk_size: int = None,
                 batch_size: ('b', int) = None):
+
     kwargs = dict(input_path=input_path,
-                  model_name=model,
                   level=level,
                   output_dir=output_dir,
                   label=label,
@@ -274,10 +273,13 @@ def fixed_batch(input_path: str,
                   filter_slide=filter_slide,
                   slide_reader=slide_reader,
                   batch_size=batch_size)
-    _model = ModelFactory(model, gpu=gpu).get_model()
+
+    gpu = _convert_gpu_params(gpu)
+    model = ModelFactory(model, gpu=gpu).get_model()
+    kwargs['model'] = model
     if _filter:
         kwargs['_filter'] = _filter
-        if _model.patch_size:
+        if model.patch_size:
             cls = FilteredPatchRunner
         else:
             cls = FilteredPixelRunner

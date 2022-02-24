@@ -32,12 +32,12 @@ test: install
 
 docker-per-model:
 	mkdir -p docker-build
-	cd docker; ./docker_cmd.py -v $(TAG) $(DOCKER_ARGS) build --build-arg $(BUILD_ARG) -e $(EXTRA_TAGS)
+	cd docker; PYTHONPATH=$(PYTHONPATH):$(PWD) ./docker_cmd.py -v $(TAG) $(DOCKER_ARGS) build --build-arg $(BUILD_ARG) -e $(EXTRA_TAGS)
 clean:
 	rm -f install
 	rm -f test
 	rm -rf docker-build
 
 docker-push: docker
-	cd docker/; ./docker-push.sh $(TAG) $(EXTRA_TAGS)
+	cd docker/; PYTHONPATH=$(PYTHONPATH):$(PWD) ./docker-push.sh $(TAG) $(EXTRA_TAGS)
 
