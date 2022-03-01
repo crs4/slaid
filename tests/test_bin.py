@@ -6,6 +6,7 @@ import subprocess
 import unittest
 
 import numpy as np
+import onnx
 import pytest
 import zarr
 
@@ -333,6 +334,28 @@ def test_real_case_classification(classifier, mirax_slide, chunk_size,
     output_tumor = np.around(output_tumor, round_to_decimal)
     expected_tumor = np.around(expected_tumor, round_to_decimal)
     assert (output_tumor == expected_tumor).all()
+
+
+def test_annotate_onnx(onnx_path):
+    pixel_format = 'Bgr8'
+    pixel_range = 'NominalRange_0_255'
+    cmd = [
+        'annotate_onnx.py', onnx_path, '--pixel-format', pixel_format,
+        '--pixel-range', pixel_range
+    ]
+    logger.info('cmd %s', ' '.join(cmd))
+    subprocess.check_call(cmd)
+    onnx_model = onnx.load(onnx_path)
+    metadata = {}
+    for prop in onnx_model.metadata_props:
+        metadata[prop.key] = prop.value
+    assert len(metadata) == 2
+    assert metadata['Image.BitmapPixelFormat'] == pixel_format
+    assert metadata['Image.NominalPixelRange'] == pixel_range
+
+    assert len(metadata) == 2
+
+    subprocess.check_call(cmd)
 
 
 if __name__ == '__main__':

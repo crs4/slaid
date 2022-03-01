@@ -1,3 +1,5 @@
+import os
+import shutil
 from datetime import datetime as dt
 
 import numpy as np
@@ -147,3 +149,10 @@ def mask():
 def patch_array():
     patch_array = np.load(open('tests/data/patch.npy', 'rb'))
     return patch_array
+
+
+@pytest.fixture
+def onnx_path(tmp_path):
+    dest = os.path.join(tmp_path, 'model.onnx')
+    shutil.copy('slaid/resources/models/tissue_model-eddl-1.1.onnx', dest)
+    return dest

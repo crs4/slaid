@@ -16,6 +16,6 @@ setuptools.setup(name="slaid",
                  ],
                  python_requires='>=3.6',
                  install_requires=reqs,
-                 scripts=['bin/classify.py', 'bin/render_mask.py'],
+                 scripts=['bin/classify.py', 'bin/annotate_onnx.py'],
                  package_data={'': ['resources/models/*']},
                  include_package_data=True)
