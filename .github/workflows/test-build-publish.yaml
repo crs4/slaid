@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-          tag: [gpu, cudnn]
+          tag: [cudnn]
 
     steps:
     - uses: actions/checkout@v2
