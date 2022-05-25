@@ -1,18 +1,18 @@
+import json
 import logging
+import time
 from dataclasses import dataclass
-from datetime import datetime as dt
 from functools import partial
-from typing import Tuple, Union
+from typing import Tuple
 
 import numpy as np
 
 from slaid.classifiers.base import Classifier as BaseClassifier
-from slaid.classifiers.base import append_array
 from slaid.commons import Filter, Mask
 from slaid.commons.base import ArrayFactory, ImageInfo, Slide
 from slaid.models import Model
 
-logger = logging.getLogger()
+logger = logging.getLogger("classifiers")
 
 
 @dataclass
@@ -53,6 +53,7 @@ class Classifier(BaseClassifier):
     def _predict_by_batch(self, batch_iterator: BatchIterator,
                           all_buffer: bool) -> np.ndarray:
 
+        start = time.time()
         predictions = []
         for batch in batch_iterator.iter():
             predictions.append(self._predict(batch))
@@ -61,6 +62,8 @@ class Classifier(BaseClassifier):
             predictions.append(self._predict(batch_iterator.buffer))
         predictions = np.concatenate(predictions) if predictions else np.empty(
             (0, ))
+        self._predict_time += time.time() - start
+
         return predictions
 
 
@@ -167,11 +170,14 @@ class FilteredPatchClassifier(FilteredClassifier):
                                     self.model.image_info).array
             patches.append(patch)
 
+        start = time.time()
         for index in range(0, n_patches, batch_size):
 
             to_predict = np.array(patches[index:index + batch_size])
             prediction = self._predict(to_predict)
             predictions[index:index + batch_size] = prediction
+
+        self._predict_time += time.time() - start
 
         predictions = self._threshold(predictions, threshold)
         predictions = self._round_to_0_100(predictions, round_to_0_100)

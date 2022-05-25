@@ -122,6 +122,7 @@ class Mask:
     slide: str = None
     label: str = None
     tile_size: int = 1
+    predict_time: int = None
 
     def __post_init__(self):
         self.dzi_sampling_level = math.ceil(
@@ -177,6 +178,7 @@ class Mask:
         attrs['round_to_0_100'] = self.round_to_0_100
         attrs['slide_levels'] = self.slide_levels
         attrs['tile_size'] = self.tile_size
+        attrs['predict_time'] = self.predict_time
         if self.threshold:
             attrs['threshold'] = self.threshold
         if self.model:

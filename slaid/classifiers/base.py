@@ -29,6 +29,7 @@ class Classifier(abc.ABC):
         self.model = model
         self.label = label
         self.array_factory = array_factory or NumpyArrayFactory()
+        self._predict_time = 0
 
         try:
             self._patch_size = self.model.patch_size
@@ -64,7 +65,8 @@ class Classifier(abc.ABC):
                                slide.level_dimensions,
                                round_to_0_100,
                                model=str(self.model),
-                               tile_size=tile_size)
+                               tile_size=tile_size,
+                               predict_time=self._predict_time)
 
     @staticmethod
     def _round_to_0_100(array: np.ndarray, round_: bool) -> np.ndarray:
