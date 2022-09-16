@@ -54,23 +54,26 @@ def test_filter(mask):
     assert (filter_[1:, :] == 1).all()
 
 
-def test_filter_rescale(mask):
-    filter_ = mask >= 5
-    print(filter_._array)
-    filter_.rescale((9, 9))
-    expected = [
-        [False, False, False, False, False, False, False, False, False],
-        [False, False, False, False, False, False, False, False, False],
-        [False, False, False, False, False, False, False, False, False],
-        [False, False, False, False, False, False, True, True, True],
-        [False, False, False, False, False, False, True, True, True],
-        [False, False, False, False, False, False, True, True, True],
-        [True, True, True, True, True, True, True, True, True],
-        [True, True, True, True, True, True, True, True, True],
-        [True, True, True, True, True, True, True, True, True],
-    ]
-    print(filter_._array)
-    assert (filter_[:, :] == np.array(expected)).all()
+@pytest.mark.parametrize('image_info', [
+    ImageInfo.create('bgr', 'yx', 'first', '0_255'),
+])
+def test_convert_to_pixel_range_1_1(image_info: ImageInfo, array_0_255):
+    converted_array = image_info.convert(
+        array_0_255, ImageInfo.create('bgr', 'yx', 'first', '1_1'))
+    assert converted_array.dtype == 'float64'
+    assert np.max(converted_array) == 1
+    assert np.min(converted_array) == -1
+
+
+@pytest.mark.parametrize('image_info', [
+    ImageInfo.create('bgr', 'yx', 'first', '0_255'),
+])
+def test_convert_to_pixel_range_0_1(image_info: ImageInfo, array_0_255):
+    converted_array = image_info.convert(
+        array_0_255, ImageInfo.create('bgr', 'yx', 'first', '0_1'))
+    assert converted_array.dtype == 'float64'
+    assert np.max(converted_array) == 1
+    assert np.min(converted_array) == 0
 
 
 if __name__ == '__main__':

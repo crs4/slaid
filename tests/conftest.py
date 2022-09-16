@@ -118,29 +118,6 @@ def classifier(classifier_cls, model, feature='test'):
 
 
 @pytest.fixture
-def green_slide_and_classifier(backend, slide_cls, image_info):
-
-    slide_path = 'tests/data/test.tif'
-    if backend == 'basic':
-        return Slide(SlideStore(slide_cls(slide_path)),
-                     image_info), BasicClassifier(GreenModel(), 'tissue')
-    else:
-        return NotImplementedError(backend)
-
-
-@pytest.fixture
-def green_slide_and_patch_classifier(backend, slide_cls, image_info):
-
-    slide_path = 'tests/data/test.tif'
-    if backend == 'basic':
-        return Slide(SlideStore(slide_cls(slide_path)),
-                     image_info), BasicClassifier(
-                         EddlGreenPatchModel(patch_size=(10, 10)), 'tissue')
-    else:
-        return NotImplementedError(backend)
-
-
-@pytest.fixture
 def mask():
     return Mask(np.arange(9).reshape((3, 3)), 0, 1, [(3, 3)])
 
@@ -156,3 +133,10 @@ def onnx_path(tmp_path):
     dest = os.path.join(tmp_path, 'model.onnx')
     shutil.copy('slaid/resources/models/tissue_model-eddl-1.1.onnx', dest)
     return dest
+
+
+@pytest.fixture
+def array_0_255():
+    array = np.zeros((3, 1, 256), dtype='uint8')
+    array[0, 0, :] = np.arange(256, dtype='uint8')
+    return array
