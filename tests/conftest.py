@@ -11,6 +11,7 @@ from slaid.commons.base import Slide
 from slaid.commons.ecvl import BasicSlide as EcvlSlide
 from slaid.commons.factory import MetaSlideFactory
 from slaid.models.factory import Factory
+from slaid.runners import DirCache
 from tests.commons import DummyModel, EddlGreenPatchModel, GreenModel
 
 
@@ -18,16 +19,18 @@ from tests.commons import DummyModel, EddlGreenPatchModel, GreenModel
 def slide_with_mask():
 
     def _slide_with_mask(create_array_func):
-        slide = EcvlSlide('tests/data/patch.tif')
+        slide = EcvlSlide("tests/data/patch.tif")
         array = create_array_func(slide.dimensions[::-1])
-        slide.masks['mask'] = Mask(array,
-                                   0,
-                                   1,
-                                   slide.level_dimensions,
-                                   dt.now(),
-                                   False,
-                                   model='model',
-                                   tile_size=10)
+        slide.masks["mask"] = Mask(
+            array,
+            0,
+            1,
+            slide.level_dimensions,
+            dt.now(),
+            False,
+            model="model",
+            tile_size=10,
+        )
         return slide
 
     return _slide_with_mask
@@ -156,3 +159,8 @@ def onnx_path(tmp_path):
     dest = os.path.join(tmp_path, 'model.onnx')
     shutil.copy('slaid/resources/models/tissue_model-eddl-1.1.onnx', dest)
     return dest
+
+
+@pytest.fixture
+def cache(tmp_path):
+    return DirCache(os.path.join(tmp_path, 'cache'))

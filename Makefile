@@ -17,6 +17,7 @@ docker-main:
 	cp requirements.txt docker-build/
 	cp -r slaid docker-build/
 	cp -r bin docker-build/
+	cp -r .git docker-build/
 	cd docker-build &&	docker build . -f ../docker/Dockerfile -t slaid:$(TAG) --build-arg $(BUILD_ARG)
 	docker tag slaid:$(TAG) slaid
 	tests/docker/test_docker.sh

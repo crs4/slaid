@@ -14,8 +14,8 @@ from slaid.commons.base import ImageInfo
 from slaid.models import Factory as BaseFactory
 from slaid.models import Model as BaseModel
 
-logger = logging.getLogger('eddl-models')
-fh = logging.FileHandler('/tmp/eddl.log')
+logger = logging.getLogger("eddl-models")
+fh = logging.FileHandler("/tmp/eddl.log")
 logger.addHandler(fh)
 
 
@@ -28,12 +28,14 @@ class Model(BaseModel, ABC):
     )
     index_prediction = 1
 
-    def __init__(self,
-                 net: eddl.Model,
-                 weight_filename: str = None,
-                 gpu: List = None,
-                 image_info: ImageInfo = None,
-                 name: str = None):
+    def __init__(
+        self,
+        net: eddl.Model,
+        weight_filename: str = None,
+        gpu: List = None,
+        image_info: ImageInfo = None,
+        name: str = None,
+    ):
         self._net = net
         self._weight_filename = weight_filename
         self._gpu = gpu
@@ -73,9 +75,12 @@ class Model(BaseModel, ABC):
 
 class TissueModel(Model):
     index_prediction = 1
-    default_image_info = ImageInfo(ImageInfo.ColorType.RGB, ImageInfo.Coord.YX,
-                                   ImageInfo.Channel.LAST,
-                                   ImageInfo.Range._0_255)
+    default_image_info = ImageInfo(
+        ImageInfo.ColorType.RGB,
+        ImageInfo.Coord.YX,
+        ImageInfo.Channel.LAST,
+        ImageInfo.Range._0_255,
+    )
 
     @staticmethod
     def create_net():
@@ -92,9 +97,12 @@ class TissueModel(Model):
 class TumorModel(Model):
     patch_size = (256, 256)
     index_prediction = 1
-    default_image_info = ImageInfo(ImageInfo.ColorType.BGR, ImageInfo.Coord.YX,
-                                   ImageInfo.Channel.FIRST,
-                                   ImageInfo.Range._0_1)
+    default_image_info = ImageInfo(
+        ImageInfo.ColorType.BGR,
+        ImageInfo.Coord.YX,
+        ImageInfo.Channel.FIRST,
+        ImageInfo.Range._0_1,
+    )
 
     @staticmethod
     def create_net():
@@ -109,23 +117,28 @@ class TumorModel(Model):
     def _create_VGG16(in_layer, num_classes, seed=1234, init=eddl.HeNormal):
         x = in_layer
         x = eddl.ReLu(init(eddl.Conv(x, 64, [3, 3]), seed))
-        x = eddl.MaxPool(eddl.ReLu(init(eddl.Conv(x, 64, [3, 3]), seed)),
-                         [2, 2], [2, 2])
+        x = eddl.MaxPool(
+            eddl.ReLu(init(eddl.Conv(x, 64, [3, 3]), seed)), [2, 2], [2, 2]
+        )
         x = eddl.ReLu(init(eddl.Conv(x, 128, [3, 3]), seed))
-        x = eddl.MaxPool(eddl.ReLu(init(eddl.Conv(x, 128, [3, 3]), seed)),
-                         [2, 2], [2, 2])
+        x = eddl.MaxPool(
+            eddl.ReLu(init(eddl.Conv(x, 128, [3, 3]), seed)), [2, 2], [2, 2]
+        )
         x = eddl.ReLu(init(eddl.Conv(x, 256, [3, 3]), seed))
         x = eddl.ReLu(init(eddl.Conv(x, 256, [3, 3]), seed))
-        x = eddl.MaxPool(eddl.ReLu(init(eddl.Conv(x, 256, [3, 3]), seed)),
-                         [2, 2], [2, 2])
+        x = eddl.MaxPool(
+            eddl.ReLu(init(eddl.Conv(x, 256, [3, 3]), seed)), [2, 2], [2, 2]
+        )
         x = eddl.ReLu(init(eddl.Conv(x, 512, [3, 3]), seed))
         x = eddl.ReLu(init(eddl.Conv(x, 512, [3, 3]), seed))
-        x = eddl.MaxPool(eddl.ReLu(init(eddl.Conv(x, 512, [3, 3]), seed)),
-                         [2, 2], [2, 2])
+        x = eddl.MaxPool(
+            eddl.ReLu(init(eddl.Conv(x, 512, [3, 3]), seed)), [2, 2], [2, 2]
+        )
         x = eddl.ReLu(init(eddl.Conv(x, 512, [3, 3]), seed))
         x = eddl.ReLu(init(eddl.Conv(x, 512, [3, 3]), seed))
-        x = eddl.MaxPool(eddl.ReLu(init(eddl.Conv(x, 512, [3, 3]), seed)),
-                         [2, 2], [2, 2])
+        x = eddl.MaxPool(
+            eddl.ReLu(init(eddl.Conv(x, 512, [3, 3]), seed)), [2, 2], [2, 2]
+        )
         x = eddl.Reshape(x, [-1])
         x = eddl.ReLu(init(eddl.Dense(x, 256), seed))
         x = eddl.Softmax(eddl.Dense(x, num_classes))
@@ -158,27 +171,27 @@ class Factory(BaseFactory):
         return globals()[cls_name](net, name=os.path.basename(self.filename))
 
     def _build_net(self, net):
-        eddl.build(net,
-                   eddl.rmsprop(self.learn_rate),
-                   self.list_of_losses,
-                   self.list_of_metrics,
-                   eddl.CS_GPU(self.gpu, mem="low_mem")
-                   if self.gpu else eddl.CS_CPU(),
-                   init_weights=False)
+        eddl.build(
+            net,
+            eddl.rmsprop(self.learn_rate),
+            self.list_of_losses,
+            self.list_of_metrics,
+            eddl.CS_GPU(self.gpu, mem="low_mem") if self.gpu else eddl.CS_CPU(),
+            init_weights=False,
+        )
 
     def _get_cls_name(self):
         if self.cls_name:
             cls_name = self.cls_name
         else:
             basename = os.path.basename(self.filename)
-            cls_name = basename.split('-')[0]
+            cls_name = basename.split("-")[0]
             cls_name = stringcase.capitalcase(stringcase.camelcase(cls_name))
         return cls_name
 
 
 @dataclass
 class OnnxFactory(Factory):
-
     def get_model(self):
         net = eddl.import_net_from_onnx_file(self.filename)
         self._build_net(net)
@@ -187,22 +200,22 @@ class OnnxFactory(Factory):
         cls = globals()[cls_name]
 
         image_info = self._update_image_info(cls.default_image_info)
-        return cls(net,
-                   image_info=image_info,
-                   name=os.path.basename(self.filename))
+        return cls(net, image_info=image_info, name=os.path.basename(self.filename))
 
     def _update_image_info(self, image_info: ImageInfo) -> ImageInfo:
 
-        image_info = ImageInfo(color_type=image_info.color_type,
-                               coord=image_info.coord,
-                               channel=image_info.channel,
-                               pixel_range=image_info.pixel_range)
+        image_info = ImageInfo(
+            color_type=image_info.color_type,
+            coord=image_info.coord,
+            channel=image_info.channel,
+            pixel_range=image_info.pixel_range,
+        )
         onnx_model = onnx.load(self.filename)
         for prop in onnx_model.metadata_props:
             if prop.key == "Image.BitmapPixelFormat":
                 color_type = prop.value[:3].lower()
                 image_info.color_type = ImageInfo.ColorType(color_type)
             if prop.key == "Image.NominalPixelRange":
-                pixel_range = prop.value.split('_', 1)[1]
+                pixel_range = prop.value.split("_", 1)[1]
                 image_info.pixel_range = ImageInfo.Range(pixel_range)
         return image_info

@@ -12,14 +12,13 @@ from slaid.models.eddl import Model as EddlModel
 
 
 class Factory(BaseFactory):
-
     def get_model(self):
-        with open(self._filename, 'rb') as f:
+        with open(self._filename, "rb") as f:
             return pickle.load(f)
 
 
 class GreenModel(BaseModel):
-    image_info = ImageInfo.create('rgb', 'yx', 'last')
+    image_info = ImageInfo.create("rgb", "yx", "last")
 
     def __init__(self, patch_size=None):
         self.patch_size = patch_size
@@ -29,7 +28,6 @@ class GreenModel(BaseModel):
 
 
 class EddlGreenModel(EddlModel):
-
     def __init__(self, patch_size=None):
         self.patch_size = patch_size
 
@@ -45,7 +43,6 @@ class EddlGreenModel(EddlModel):
 
 
 class EddlGreenPatchModel(EddlModel):
-
     def __init__(self, patch_size=(256, 256)):
         self.patch_size = patch_size
 
@@ -63,7 +60,6 @@ class EddlGreenPatchModel(EddlModel):
 
 
 class BaseDummyModel(BaseModel):
-
     def __init__(self, patch_size=None):
         self.patch_size = patch_size
         self.array_predicted = []
@@ -77,7 +73,7 @@ class BaseDummyModel(BaseModel):
 
 
 class DummyModel(BaseDummyModel):
-    image_info = ImageInfo.create('bgr', 'yx', 'last')
+    image_info = ImageInfo.create("bgr", "yx", "last")
 
     def __init__(self, func, patch_size=None):
         self.func = func
@@ -88,11 +84,12 @@ class DummyModel(BaseDummyModel):
 
 
 class DummySlide(Slide):
-
-    def __init__(self,
-                 level_dimensions: List[Tuple[int, int]],
-                 level_downsamples: List[Tuple[int, int]],
-                 ID=None):
+    def __init__(
+        self,
+        level_dimensions: List[Tuple[int, int]],
+        level_downsamples: List[Tuple[int, int]],
+        ID=None,
+    ):
         self._level_dimensions = level_dimensions
         self._level_downsamples = level_downsamples
         self._ID = ID
@@ -113,8 +110,9 @@ class DummySlide(Slide):
     def level_downsamples(self):
         return self._level_downsamples
 
-    def read_region(self, location: Tuple[int, int], level: int,
-                    size: Tuple[int, int]) -> Image:
+    def read_region(
+        self, location: Tuple[int, int], level: int, size: Tuple[int, int]
+    ) -> Image:
         raise NotImplementedError()
 
     def get_best_level_for_downsample(self, downsample: int):
@@ -122,7 +120,6 @@ class DummySlide(Slide):
 
 
 class AllOneModel(BaseDummyModel):
-
     def _predict(self, array):
         return np.ones(array.shape[0], dtype=np.uint8)
 

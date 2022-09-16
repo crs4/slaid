@@ -9,10 +9,9 @@ REGISTRY = {}
 
 
 class Storage(abc.ABC):
-
     def __init_subclass__(cls, _name, **kwargs):
         super().__init_subclass__(**kwargs)
-        for key in _name.split(','):
+        for key in _name.split(","):
             REGISTRY[key] = cls
 
     @abc.abstractmethod
@@ -33,22 +32,23 @@ class Storage(abc.ABC):
 
 
 def _get_slide_metadata(slide: BasicSlide) -> dict:
-    return {'filename': slide.filename, 'resolution': slide.dimensions}
+    return {"filename": slide.filename, "resolution": slide.dimensions}
 
 
-def _dump_masks(path: str,
-                slide: BasicSlide,
-                overwrite: bool,
-                func: str,
-                only_mask: str = None,
-                **kwargs):
+def _dump_masks(
+    path: str,
+    slide: BasicSlide,
+    overwrite: bool,
+    func: str,
+    only_mask: str = None,
+    **kwargs
+):
     masks = {only_mask: slide.masks[only_mask]} if only_mask else slide.masks
     for name, mask_ in masks.items():
         getattr(mask_, func)(os.path.join(path, name), overwrite, **kwargs)
 
 
 class ReducedSlide(BasicSlide):
-
     def __init__(self, filename: str):
         self._filename = os.path.abspath(filename)
         self.masks: Dict[str, Mask] = {}
@@ -64,8 +64,7 @@ class ReducedSlide(BasicSlide):
     def filename(self):
         return self._filename
 
-    def read_region(self, location: Tuple[int, int],
-                    size: Tuple[int, int]) -> Image:
+    def read_region(self, location: Tuple[int, int], size: Tuple[int, int]) -> Image:
         raise NotImplementedError
 
     def get_best_level_for_downsample(self, downsample: int):

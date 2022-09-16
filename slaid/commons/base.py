@@ -21,23 +21,22 @@ def get_class(name, module):
 
 @dataclass
 class ImageInfo:
-
     class ColorType(Enum):
-        RGB = 'rgb'
-        BGR = 'bgr'
+        RGB = "rgb"
+        BGR = "bgr"
 
     class Coord(Enum):
-        XY = 'xy'
-        YX = 'yx'
+        XY = "xy"
+        YX = "yx"
 
     class Channel(Enum):
-        FIRST = 'first'
-        LAST = 'last'
+        FIRST = "first"
+        LAST = "last"
 
     class Range(Enum):
-        _0_1 = '0_1'
-        _1_1 = '1_1'
-        _0_255 = '0_255'
+        _0_1 = "0_1"
+        _1_1 = "1_1"
+        _0_255 = "0_255"
 
     color_type: ColorType
     coord: Coord
@@ -45,21 +44,22 @@ class ImageInfo:
     pixel_range: Range = Range._0_255
 
     _range_conversion_dict = {
-        '0_255->0_1': lambda array: array / 255.,
-        '0_255->1_1': lambda array: (array / 255.) * 2 - 1
+        "0_255->0_1": lambda array: array / 255.0,
+        "0_255->1_1": lambda array: (array / 255.0) * 2 - 1,
     }
 
     @staticmethod
-    def create(color_type: str,
-               coord: str,
-               channel: str,
-               pixel_range: str = '0_255') -> "ImageInfo":
-        return ImageInfo(ImageInfo.ColorType(color_type),
-                         ImageInfo.Coord(coord), ImageInfo.Channel(channel),
-                         ImageInfo.Range(pixel_range))
+    def create(
+        color_type: str, coord: str, channel: str, pixel_range: str = "0_255"
+    ) -> "ImageInfo":
+        return ImageInfo(
+            ImageInfo.ColorType(color_type),
+            ImageInfo.Coord(coord),
+            ImageInfo.Channel(channel),
+            ImageInfo.Range(pixel_range),
+        )
 
-    def convert(self, array: np.ndarray,
-                array_image_info: "ImageInfo") -> np.ndarray:
+    def convert(self, array: np.ndarray, array_image_info: "ImageInfo") -> np.ndarray:
         if self == array_image_info:
             return array
 
@@ -75,19 +75,18 @@ class ImageInfo:
             else:
                 array = array.transpose(2, 0, 1)
         try:
-            key = f'{self.pixel_range.value}->{array_image_info.pixel_range.value}'
+            key = f"{self.pixel_range.value}->{array_image_info.pixel_range.value}"
             array = self._range_conversion_dict[key](array)
         except KeyError:
             if self.pixel_range != array_image_info.pixel_range:
                 raise RuntimeError(
-                    f'conversion not available from {self.pixel_range} to {array_image_info.pixel_range}'
+                    f"conversion not available from {self.pixel_range} to {array_image_info.pixel_range}"
                 )
 
         return array
 
 
 class Image(abc.ABC):
-
     @abc.abstractproperty
     def dimensions(self) -> Tuple[int, int]:
         pass
@@ -106,7 +105,7 @@ def apply_threshold(array, threshold: float) -> np.ndarray:
     array = np.array(array)
     array[array > threshold] = 1
     array[array <= threshold] = 0
-    array = array.astype('uint8')
+    array = array.astype("uint8")
     return array
 
 
@@ -125,7 +124,8 @@ class Mask:
 
     def __post_init__(self):
         self.dzi_sampling_level = math.ceil(
-            math.log2(max(*self.slide_levels[self.extraction_level])))
+            math.log2(max(*self.slide_levels[self.extraction_level]))
+        )
 
     def _filter(self, operator: str, value: float) -> np.ndarray:
         mask = np.array(self.array)
@@ -134,32 +134,34 @@ class Mask:
         return getattr(mask, operator)(value)
 
     def __gt__(self, value):
-        return Filter(self, self._filter('__gt__', value))
+        return Filter(self, self._filter("__gt__", value))
 
     def __ge__(self, value):
-        return Filter(self, self._filter('__ge__', value))
+        return Filter(self, self._filter("__ge__", value))
 
     def __lt__(self, value):
-        return Filter(self, self._filter('__lt__', value))
+        return Filter(self, self._filter("__lt__", value))
 
     def __le__(self, value):
-        return Filter(self, self._filter('__le__', value))
+        return Filter(self, self._filter("__le__", value))
 
     def __ne__(self, value):
-        return Filter(self, self._filter('__ne__', value))
+        return Filter(self, self._filter("__ne__", value))
 
     def __eq__(self, other):
         if isinstance(other, float):
-            return Filter(self, self._filter('__eq__', other))
+            return Filter(self, self._filter("__eq__", other))
         check_array = (np.array(self.array) == np.array(other.array)).all()
-        return self.extraction_level == other.extraction_level \
-            and self.level_downsample == other.level_downsample \
-            and self.threshold == other.threshold \
-            and self.model == other.model \
-            and self.round_to_0_100 == other.round_to_0_100 \
-            and self.tile_size == other.tile_size \
-            and self.slide == other.slide \
+        return (
+            self.extraction_level == other.extraction_level
+            and self.level_downsample == other.level_downsample
+            and self.threshold == other.threshold
+            and self.model == other.model
+            and self.round_to_0_100 == other.round_to_0_100
+            and self.tile_size == other.tile_size
+            and self.slide == other.slide
             and check_array
+        )
 
     def to_image(self, downsample: int = 1, threshold: float = None):
         array = self.array[::downsample, ::downsample]
@@ -167,25 +169,24 @@ class Mask:
             array = array / 100
         if threshold:
             array = apply_threshold(array, threshold)
-        return PIL.Image.fromarray((255 * array).astype('uint8'), 'L')
+        return PIL.Image.fromarray((255 * array).astype("uint8"), "L")
 
     def get_attributes(self):
         attrs = {}
-        attrs['extraction_level'] = self.extraction_level
-        attrs['dzi_sampling_level'] = self.dzi_sampling_level
-        attrs['level_downsample'] = self.level_downsample
-        attrs['round_to_0_100'] = self.round_to_0_100
-        attrs['slide_levels'] = self.slide_levels
-        attrs['tile_size'] = self.tile_size
+        attrs["extraction_level"] = self.extraction_level
+        attrs["dzi_sampling_level"] = self.dzi_sampling_level
+        attrs["level_downsample"] = self.level_downsample
+        attrs["round_to_0_100"] = self.round_to_0_100
+        attrs["slide_levels"] = self.slide_levels
+        attrs["tile_size"] = self.tile_size
         if self.threshold:
-            attrs['threshold'] = self.threshold
+            attrs["threshold"] = self.threshold
         if self.model:
-            attrs['model'] = self.model
+            attrs["model"] = self.model
         return attrs
 
 
 class Filter:
-
     def __init__(self, mask: Mask, array: np.ndarray):
         self._mask = mask
 
@@ -207,21 +208,25 @@ class Filter:
 
     def rescale(self, size: int):
         if size < self._array.shape:
-            raise NotImplementedError('size %s < %s', size, self._array.shape)
+            raise NotImplementedError("size %s < %s", size, self._array.shape)
         if size == self._array.shape:
             return self._array
-        scale = (size[0] // int(self._array.shape[0]),
-                 size[1] // int(self._array.shape[1]))
-        res = np.zeros(size, dtype='bool')
+        scale = (
+            size[0] // int(self._array.shape[0]),
+            size[1] // int(self._array.shape[1]),
+        )
+        res = np.zeros(size, dtype="bool")
         for x in range(self._array.shape[0]):
             for y in range(self._array.shape[1]):
-                res[x * scale[0]:x * scale[0] + scale[0],
-                    y * scale[1]:y * scale[1] + scale[1]] = self._array[x, y]
+                res[
+                    x * scale[0] : x * scale[0] + scale[0],
+                    y * scale[1] : y * scale[1] + scale[1],
+                ] = self._array[x, y]
         self._array = res
 
 
 class BasicSlide(abc.ABC):
-    IMAGE_INFO = ImageInfo.create('bgr', 'yx', 'first')
+    IMAGE_INFO = ImageInfo.create("bgr", "yx", "first")
 
     class InvalidFile(Exception):
         pass
@@ -242,8 +247,9 @@ class BasicSlide(abc.ABC):
         return self._filename
 
     @abc.abstractmethod
-    def read_region(self, location: Tuple[int, int], level: int,
-                    size: Tuple[int, int]) -> Image:
+    def read_region(
+        self, location: Tuple[int, int], level: int, size: Tuple[int, int]
+    ) -> Image:
         pass
 
     @abc.abstractmethod
@@ -264,7 +270,6 @@ class BasicSlide(abc.ABC):
 
 
 class Slide(BasicSlide):
-
     def __init__(self, slide_reader: BasicSlide):
         self._slide_reader = slide_reader
 
@@ -287,8 +292,9 @@ class Slide(BasicSlide):
     def filename(self):
         return self._slide_reader.filename
 
-    def read_region(self, location: Tuple[int, int], level: int,
-                    size: Tuple[int, int]) -> Image:
+    def read_region(
+        self, location: Tuple[int, int], level: int, size: Tuple[int, int]
+    ) -> Image:
         return self._slide_reader.read_region(location, level, size)
 
     def get_best_level_for_downsample(self, downsample: int):
@@ -304,7 +310,6 @@ class Slide(BasicSlide):
 
 
 class SlideArray(abc.ABC):
-
     @abc.abstractmethod
     def __getitem__(self, key) -> "SlideArray":
         ...
@@ -323,7 +328,6 @@ class SlideArray(abc.ABC):
 
 
 class BasicSlideArray(SlideArray):
-
     def __init__(self, slide: BasicSlide, level: int, image_info: ImageInfo):
         self._slide = slide
         self._level = level
@@ -334,45 +338,49 @@ class BasicSlideArray(SlideArray):
     def array(self):
         if self._array is not None:
             return self._array
-        logger.warn('reading the whole slide...')
+        logger.warn("reading the whole slide...")
 
         image = self._slide.read_region(
-            (0, 0), self._level, self._slide.level_dimensions[self._level])
+            (0, 0), self._level, self._slide.level_dimensions[self._level]
+        )
         self._array = image.to_array()
         return self._array
 
     def __getitem__(self, key: Tuple[slice, slice]) -> "SlideArray":
-
         def get_slice_stop(slice_value: int, limit: int):
-            return min(slice_value,
-                       limit) if slice_value is not None else limit
+            return min(slice_value, limit) if slice_value is not None else limit
 
         if self._array is not None:
-            array = self._array[:, key[0], key[1]] if self._is_channel_first(
-            ) else self._array[key[0], key[1], :]
+            array = (
+                self._array[:, key[0], key[1]]
+                if self._is_channel_first()
+                else self._array[key[0], key[1], :]
+            )
         else:
             slice_x = key[1]
             slice_y = key[0]
 
             slice_x_start = slice_x.start or 0
             slice_x_stop = get_slice_stop(
-                slice_x.stop, self._slide.level_dimensions[self._level][0])
+                slice_x.stop, self._slide.level_dimensions[self._level][0]
+            )
 
             slice_y_start = slice_y.start or 0
             slice_y_stop = get_slice_stop(
-                slice_y.stop, self._slide.level_dimensions[self._level][1])
+                slice_y.stop, self._slide.level_dimensions[self._level][1]
+            )
 
             slice_x = slice(slice_x_start, slice_x_stop)
             slice_y = slice(slice_y_start, slice_y_stop)
 
             location = (slice_x.start, slice_y.start)
-            location_at_level_0 = tuple([
-                int(c * self._slide.level_downsamples[self._level])
-                for c in location
-            ])
+            location_at_level_0 = tuple(
+                [int(c * self._slide.level_downsamples[self._level]) for c in location]
+            )
             size = (slice_x.stop - slice_x.start, slice_y.stop - slice_y.start)
-            array = self._slide.read_region(location_at_level_0, self._level,
-                                            size).to_array()
+            array = self._slide.read_region(
+                location_at_level_0, self._level, size
+            ).to_array()
         slide_array = self._clone(array)
         return slide_array
 
@@ -383,15 +391,19 @@ class BasicSlideArray(SlideArray):
     @property
     def size(self) -> Tuple[int, int]:
         if self._array is not None:
-            return self._array.shape[1:] if self._is_channel_first(
-            ) else self._array.shape[:2]
+            return (
+                self._array.shape[1:]
+                if self._is_channel_first()
+                else self._array.shape[:2]
+            )
         return self._slide.level_dimensions[self._level][::-1]
 
-    def _clone(self,
-               array: np.ndarray = None,
-               image_info: ImageInfo = None) -> SlideArray:
-        slide_array = BasicSlideArray(self._slide, self._level, image_info
-                                      or self.image_info)
+    def _clone(
+        self, array: np.ndarray = None, image_info: ImageInfo = None
+    ) -> SlideArray:
+        slide_array = BasicSlideArray(
+            self._slide, self._level, image_info or self.image_info
+        )
         slide_array._array = array
         return slide_array
 
@@ -400,7 +412,6 @@ class BasicSlideArray(SlideArray):
 
 
 class ArrayFactory(abc.ABC):
-
     @abc.abstractmethod
     def empty(self, shape: Tuple[int, int], dtype: str):
         ...
@@ -411,7 +422,6 @@ class ArrayFactory(abc.ABC):
 
 
 class NumpyArrayFactory(ArrayFactory):
-
     def empty(self, shape: Tuple[int, int], dtype: str):
         return np.empty(shape, dtype=dtype)
 

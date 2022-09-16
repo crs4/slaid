@@ -6,7 +6,7 @@ from slaid.commons import ImageInfo
 
 
 class Model(abc.ABC):
-    image_info = ImageInfo.create('bgr', 'yx', 'first')
+    image_info = ImageInfo.create("bgr", "yx", "first")
 
     def __init__(self, name: str = None):
         self.name = name
@@ -17,7 +17,6 @@ class Model(abc.ABC):
 
 
 class Factory(abc.ABC):
-
     def __init__(self, filename):
         self._filename = filename
 

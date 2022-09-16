@@ -9,7 +9,7 @@ from slaid.commons.base import BasicSlide as BaseSlide
 
 
 class Image(BaseImage):
-    IMAGE_INFO = ImageInfo.create('rgb', 'yx', 'last')
+    IMAGE_INFO = ImageInfo.create("rgb", "yx", "last")
 
     def __init__(self, image: PIL_Image):
         self._image = image
@@ -47,8 +47,9 @@ class BasicSlide(BaseSlide):
     def filename(self):
         return self._filename
 
-    def read_region(self, location: Tuple[int, int], level: int,
-                    size: Tuple[int, int]) -> BaseImage:
+    def read_region(
+        self, location: Tuple[int, int], level: int, size: Tuple[int, int]
+    ) -> BaseImage:
         return Image(self._slide.read_region(location, level, size))
 
     def get_best_level_for_downsample(self, downsample: int):

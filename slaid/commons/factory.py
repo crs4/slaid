@@ -4,11 +4,10 @@ from dataclasses import dataclass
 
 from slaid.commons import BasicSlide, ImageInfo, Slide
 
-logger = logging.getLogger('slaid.commons.factory')
+logger = logging.getLogger("slaid.commons.factory")
 
 
 class BaseSlideFactory(abc.ABC):
-
     @abc.abstractmethod
     def get_slide(self) -> Slide:
         ...
@@ -19,7 +18,6 @@ class MetaSlideFactory:
 
     @staticmethod
     def register(cls_to_create: Slide):
-
         def _register(cls_factory: BaseSlideFactory):
             MetaSlideFactory._registry[cls_to_create] = cls_factory
 

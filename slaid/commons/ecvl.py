@@ -39,11 +39,11 @@ from slaid.commons import ImageInfo
 
 import slaid.commons.base as base
 
-logger = logging.getLogger('ecvl')
+logger = logging.getLogger("ecvl")
 
 
 class Image(BaseImage):
-    IMAGE_INFO = ImageInfo.create('rgb', 'yx', 'first')
+    IMAGE_INFO = ImageInfo.create("rgb", "yx", "first")
 
     def __init__(self, image: EcvlImage):
         self._image = image
@@ -73,8 +73,9 @@ class BasicSlide(base.BasicSlide):
     def dimensions(self) -> Tuple[int, int]:
         return tuple(self._slide.GetLevelsDimensions()[0])
 
-    def read_region(self, location: Tuple[int, int], level,
-                    size: Tuple[int, int]) -> Image:
+    def read_region(
+        self, location: Tuple[int, int], level, size: Tuple[int, int]
+    ) -> Image:
         return Image(self._slide.ReadRegion(level, location + size))
 
     def get_best_level_for_downsample(self, downsample: int):

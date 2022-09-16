@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import os
+import shutil
 import subprocess
 import unittest
 
@@ -356,6 +357,32 @@ def test_annotate_onnx(onnx_path):
     assert len(metadata) == 2
 
     subprocess.check_call(cmd)
+
+
+@pytest.mark.parametrize('classifier', ['fixed-batch'])
+@pytest.mark.parametrize('model', [
+    'slaid/resources/models/tissue_model-extract_tissue_eddl_1.1.bin',
+])
+@pytest.mark.parametrize('writer', ['zip', 'zarr'])
+def test_classify_with_cache(classifier, tmp_path, model, writer):
+    label = 'tissue'
+    path = str(tmp_path)
+    cmd = [
+        'classify.py', classifier, '-L', label, '-m', model, '-l', '2', '-o',
+        path, input_, '--cache-dir',
+        os.path.join(tmp_path, 'cache'), '--writer', writer
+    ]
+    print(' '.join(cmd))
+    subprocess.check_call(cmd)
+    logger.info('running cmd %s', ' '.join(cmd))
+    output_path = os.path.join(path, f'{input_basename}.{writer}')
+
+    shutil.rmtree(output_path, ignore_errors=True) if os.path.isdir(
+        output_path) else os.remove(output_path)
+
+    assert not os.path.exists(output_path)
+    subprocess.check_call(cmd)
+    assert os.path.exists(output_path)
 
 
 if __name__ == '__main__':
